@@ -160,50 +160,50 @@ static int load_rom_path(const char *path, char *error, size_t error_size) {
     int normalized = 0;
     unsigned mapper = 0;
 
-    if (error && error_size) error[0] = '\\0';
-    fprintf(stderr, "NES: opening ROM: %s\\n", path ? path : "(null)");
+    if (error && error_size) error[0] = '\0';
+    fprintf(stderr, "NES: opening ROM: %s\n", path ? path : "(null)");
     fflush(stderr);
     f = fopen(path, "rb");
     if (!f) {
         if (error && error_size) snprintf(error, error_size, "Cannot open ROM: %s", strerror(errno));
-        fprintf(stderr, "NES: ROM open failed: %s\\n", strerror(errno));
+        fprintf(stderr, "NES: ROM open failed: %s\n", strerror(errno));
         return -1;
     }
     if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 16 ||
         len > 64L*1024L*1024L || fseek(f, 0, SEEK_SET) != 0) {
         if (error && error_size) snprintf(error, error_size, "ROM file size is invalid or exceeds 64 MB.");
-        fprintf(stderr, "NES: ROM size/seek check failed (length=%ld)\\n", len);
+        fprintf(stderr, "NES: ROM size/seek check failed (length=%ld)\n", len);
         fclose(f);
         return -1;
     }
-    fprintf(stderr, "NES: ROM size=%ld bytes\\n", len);
+    fprintf(stderr, "NES: ROM size=%ld bytes\n", len);
     data = (uint8_t *)malloc((size_t)len);
     if (!data) {
         if (error && error_size) snprintf(error, error_size, "Not enough memory to read this ROM.");
-        fprintf(stderr, "NES: ROM allocation failed\\n");
+        fprintf(stderr, "NES: ROM allocation failed\n");
         fclose(f);
         return -1;
     }
     if (fread(data, 1, (size_t)len, f) != (size_t)len) {
         if (error && error_size) snprintf(error, error_size, "Could not read the complete ROM file.");
-        fprintf(stderr, "NES: ROM read failed\\n");
+        fprintf(stderr, "NES: ROM read failed\n");
         free(data);
         fclose(f);
         return -1;
     }
     fclose(f);
 
-    fprintf(stderr, "NES: source header=%02x %02x %02x %02x %02x %02x %02x %02x\\n",
+    fprintf(stderr, "NES: source header=%02x %02x %02x %02x %02x %02x %02x %02x\n",
             data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
     if (nes_rom_prepare_for_libxnes(data, (size_t)len, &core_data, &core_size,
                                     &normalized, &mapper, error, error_size) != 0) {
-        fprintf(stderr, "NES: ROM preparation failed: %s\\n",
+        fprintf(stderr, "NES: ROM preparation failed: %s\n",
                 (error && error_size && error[0]) ? error : "unknown format error");
         free(data);
         return -1;
     }
     free(data);
-    fprintf(stderr, "NES: prepared ROM mapper=%u size=%lu bytes normalized=%s CHR banks=%u\\n",
+    fprintf(stderr, "NES: prepared ROM mapper=%u size=%lu bytes normalized=%s CHR banks=%u\n",
             mapper, (unsigned long)core_size, normalized ? "yes" : "no", core_data[5]);
     fflush(stderr);
 
@@ -216,13 +216,13 @@ static int load_rom_path(const char *path, char *error, size_t error_size) {
     if (!nes) {
         if (error && error_size)
             snprintf(error, error_size, "ROM was normalized, but libxnes does not implement mapper %u or rejected this cartridge.", mapper);
-        fprintf(stderr, "NES: libxnes rejected prepared ROM (mapper=%u)\\n", mapper);
+        fprintf(stderr, "NES: libxnes rejected prepared ROM (mapper=%u)\n", mapper);
         return -1;
     }
     xnes_set_speed(nes, 1.0f);
     in_game = 1;
     paused = 0;
-    fprintf(stderr, "NES: ROM core initialized successfully (mapper=%u)\\n", mapper);
+    fprintf(stderr, "NES: ROM core initialized successfully (mapper=%u)\n", mapper);
     fflush(stderr);
     return 0;
 }
