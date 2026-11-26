@@ -49,7 +49,7 @@ jobs:
 
       - name: Assemble installation and source archives
         run: |
-          printf 'libxnes=45cab8022732542d0a8c6eddd4fb26c393744afe\nFBInk=bab62e96716ef978dab52048eb4d1c79a8eecfa7\n' > vendor/UPSTREAM_VERSIONS.txt
+          printf 'libxnes=45cab8022732542d0a8c6eddd4fb26c393744afe\\nFBInk=bab62e96716ef978dab52048eb4d1c79a8eecfa7\\nKindleSDK=b4a6c99d718a7cf74935f36105c62491b4336a61\\n' > vendor/UPSTREAM_VERSIONS.txt
           tar --exclude-vcs --exclude='./build' --exclude='./dist' \
             -czf dist/Kindle-NES-Source.tar.gz .
           PKG="$PWD/dist/package"
@@ -104,9 +104,12 @@ jobs:
           - KindleHF cross-compilation and ELF checks completed successfully.
           - This is **not yet validated on physical Kindle hardware**. Framebuffer waveform behavior, touchscreen event discovery/permissions, orientation, and real-game performance remain device-test items.
 
-          ### ROM selection
-          - The emulator starts in a native file picker at `/mnt/us`. Browse directories and tap any `.nes` file; ROMs do not need to be copied into `nes/roms/`.
-          - Directory symlinks are not followed; browsing is confined to Kindle USB storage.
+          ### Interface and ROM selection
+          - GTK2 main window: Open Game, Options, Fullscreen, and Quit.
+          - Open Game launches the Gambatte-K2-style picker: Cancel and current path at the top, scrollable file list, parent-directory row, folders first, and touch-drag scrolling.
+          - Only `.nes` files are listed. Start browsing at `/mnt/us`; ROMs can remain in any subfolder. Cancel returns to the main window.
+          - The NES CPU/PPU and cartridge emulation remain libxnes; the Game Boy core is not included.
+          - GTK2/GLib/GDK libraries are dynamically linked from Kindle firmware and are not bundled.
 
           ### Current limitations
           - Audio is disabled.
