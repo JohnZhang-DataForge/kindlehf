@@ -302,17 +302,17 @@ static void draw_game_ui(void) {
 
     cx = screen_w * 76 / 100; cy = screen_h * 84 / 100; r = screen_w * 7 / 100;
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx - 7, cy - 7, "A", 2, 0);
+    draw_text(screen_buf, screen_w, screen_h, cx - 5, cy - 7, "A", 2, 0);
     cx = screen_w * 91 / 100;
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx - 7, cy - 7, "B", 2, 0);
+    draw_text(screen_buf, screen_w, screen_h, cx - 5, cy - 7, "B", 2, 0);
 
     fill_rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*78/100, screen_w*13/100, 30, 232);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*78/100, screen_w*13/100, 30, 0);
-    draw_text(screen_buf, screen_w, screen_h, screen_w*44/100, screen_h*78/100 + 10, "SELECT", 1, 0);
+    draw_text(screen_buf, screen_w, screen_h, screen_w*43/100 + (screen_w*13/100 - 70)/2, screen_h*78/100 + 8, "SELECT", 2, 0);
     fill_rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 232);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 0);
-    draw_text(screen_buf, screen_w, screen_h, screen_w*44/100, screen_h*84/100 + 10, "START", 1, 0);
+    draw_text(screen_buf, screen_w, screen_h, screen_w*43/100 + (screen_w*13/100 - 58)/2, screen_h*84/100 + 8, "START", 2, 0);
     show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
 }
 
@@ -359,7 +359,7 @@ static void render_game(void) {
         }
     }
     if (rendered_frames < 3) {
-        fprintf(stderr, "NES: rendered frame %u pixels=%dx%d grayscale=%u..%u nonwhite=%u/%u\\n",
+        fprintf(stderr, "NES: rendered frame %u pixels=%dx%d grayscale=%u..%u nonwhite=%u/%u\n",
                 rendered_frames + 1, game_w, game_h, min_gray, max_gray, dark_pixels,
                 (unsigned)(game_w * game_h));
         fflush(stderr);
