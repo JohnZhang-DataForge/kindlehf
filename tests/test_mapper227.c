@@ -14,7 +14,7 @@ int main(void) {
     uint8_t *rom = (uint8_t *)calloc(1, rom_size);
     struct xnes_ctx_t *ctx;
     struct xnes_cartridge_t *cart;
-    unsigned bank, i;
+    unsigned bank;
 
     assert(rom != NULL);
     rom[0] = 'N'; rom[1] = 'E'; rom[2] = 'S'; rom[3] = 0x1a;
