@@ -45,13 +45,12 @@ jobs:
           tar --exclude-vcs --exclude='./build' --exclude='./dist' \
             -czf dist/Kindle-NES-Source.tar.gz .
           PKG="$PWD/dist/package"
-          mkdir -p "$PKG/documents" "$PKG/nes/bin" "$PKG/nes/roms" "$PKG/nes/saves" "$PKG/THIRD_PARTY_LICENSES"
+          mkdir -p "$PKG/documents" "$PKG/nes/bin" "$PKG/nes/saves" "$PKG/THIRD_PARTY_LICENSES"
           install -m 0755 "documents/NES Emulator.sh" "$PKG/documents/NES Emulator.sh"
           install -m 0755 dist/nes "$PKG/nes/bin/nes"
           cp README-INSTALL.txt "$PKG/README-INSTALL.txt"
           cp COPYING LICENSE-NOTES.txt "$PKG/"
           cp THIRD_PARTY_LICENSES/libxnes-MIT.txt "$PKG/THIRD_PARTY_LICENSES/"
-          cp nes/roms/README.txt "$PKG/nes/roms/README.txt"
           cp nes/saves/README.txt "$PKG/nes/saves/README.txt"
           cp dist/Kindle-NES-Source.tar.gz "$PKG/Kindle-NES-Source.tar.gz"
           (cd "$PKG" && zip -qr ../Kindle-NES-Install.zip .)
@@ -81,9 +80,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.0 — prerelease
+          ## Kindle NES v0.1.1 — prerelease
 
-          Native ARM KindleHF NES emulator package for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
+          Native ARM KindleHF NES emulator package with a native touchscreen ROM file browser for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
           ### Downloads
           - **Kindle-NES-Install.zip** — copy the `documents/` and `nes/` directories to the Kindle USB storage root.
@@ -96,6 +95,10 @@ jobs:
           - GitHub-hosted Ubuntu 24.04 runner completed the host-side mapper-0 ROM/core/controller tests.
           - KindleHF cross-compilation and ELF checks completed successfully.
           - This is **not yet validated on physical Kindle hardware**. Framebuffer waveform behavior, touchscreen event discovery/permissions, orientation, and real-game performance remain device-test items.
+
+          ### ROM selection
+          - The emulator starts in a native file picker at `/mnt/us`. Browse directories and tap any `.nes` file; ROMs do not need to be copied into `nes/roms/`.
+          - Directory symlinks are not followed; browsing is confined to Kindle USB storage.
 
           ### Current limitations
           - Audio is disabled.
@@ -113,12 +116,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.0 >/dev/null 2>&1; then
-            gh release upload v0.1.0 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.1 >/dev/null 2>&1; then
+            gh release upload v0.1.1 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.0 "${ASSETS[@]}" \
+            gh release create v0.1.1 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.0" \
+              --title "Kindle NES v0.1.1" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
