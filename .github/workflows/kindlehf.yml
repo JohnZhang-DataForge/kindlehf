@@ -36,12 +36,16 @@ jobs:
           xvfb-run -a build/host/test_file_picker
           git clone https://github.com/xboot/libxnes vendor/libxnes
           git -C vendor/libxnes checkout --detach 45cab8022732542d0a8c6eddd4fb26c393744afe
+          bash patches/apply-libxnes-mapper227.sh vendor/libxnes
           python3 tests/make_mapper0_rom.py build/host/homebrew-mapper0.nes
           mapfile -t XNES_SOURCES < <(find vendor/libxnes/src -type f -name '*.c' -print | sort)
           gcc -std=gnu11 -O2 -Wall -Wextra \
             -Ivendor/libxnes/src tests/test_core.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_core
           build/host/test_core build/host/homebrew-mapper0.nes
+          gcc -std=gnu11 -O2 -Wall -Wextra -Ivendor/libxnes/src \
+            tests/test_mapper227.c "${XNES_SOURCES[@]}" -lm -o build/host/test_mapper227
+          build/host/test_mapper227
           gcc -std=gnu11 -O2 -Wall -Wextra -Isrc -Ivendor/libxnes/src \
             src/rom_compat.c tests/test_rom_compat.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_rom_compat
