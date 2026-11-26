@@ -81,6 +81,7 @@ static void mapper227_apply(struct xnes_cartridge_t *c, uint16_t addr)
 
     c->mapper.m.m225.prg_bank0 = (uint8_t)mapper227_bank(c, slot0);
     c->mapper.m.m225.prg_bank1 = (uint8_t)mapper227_bank(c, slot1);
+    c->mapper.m.m225.chr_bank = (uint8_t)mode; /* O=1 protects multicart CHR-RAM */
     c->mirror = (addr & 0x0002u) ?
         XNES_CARTRIDGE_MIRROR_HORIZONTAL :
         XNES_CARTRIDGE_MIRROR_VERTICAL;
@@ -121,7 +122,8 @@ static uint8_t mapper227_ppu_read(struct xnes_ctx_t *ctx, uint16_t addr)
 static void mapper227_ppu_write(struct xnes_ctx_t *ctx, uint16_t addr, uint8_t val)
 {
     struct xnes_cartridge_t *c = ctx->cartridge;
-    c->chr_rom[addr & 0x1fffu] = val;
+    if (!c->mapper.m.m225.chr_bank)
+        c->chr_rom[addr & 0x1fffu] = val;
 }
 
 void xnes_mapper227_init(struct xnes_cartridge_t *c)
