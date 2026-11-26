@@ -297,9 +297,10 @@ static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
     gtk_misc_set_alignment(GTK_MISC(label), 0.0f, 0.5f);
     gtk_container_set_border_width(GTK_CONTAINER(area), 18);
     gtk_box_pack_start(GTK_BOX(area), label, TRUE, TRUE, 8);
+    gtk_dialog_add_button(GTK_DIALOG(dialog), "OK", GTK_RESPONSE_OK);
+    g_signal_connect_swapped(dialog, "response",
+                             G_CALLBACK(gtk_widget_destroy), dialog);
     gtk_widget_show_all(dialog);
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
 }
 static void draw_game_ui(void) {
     int cx, cy, r;
@@ -724,6 +725,29 @@ static gboolean game_tick(gpointer user_data) {
     return in_game && !quitting;
 }
 
+/*
+ * Enter the GTK/GLib main loop before the first framebuffer draw. The Kindle
+ * did not reliably display the startup composition when it was submitted
+ * immediately after the ROM picker returned; a later PAUSE full refresh did.
+ */
+static gboolean begin_game_display(gpointer user_data) {
+    (void)user_data;
+    if (!in_game || !nes || quitting) {
+        if (gtk_main_level() > 0) gtk_main_quit();
+        return FALSE;
+    }
+
+    draw_game_ui();
+    fprintf(stderr, "NES: initial UI composed inside GTK main loop\\n");
+    fflush(stderr);
+    render_game(1);
+    next_game_update_ns = monotonic_ns();
+    fprintf(stderr, "NES: initial full-screen game/controller refresh submitted; starting emulation timer\\n");
+    fflush(stderr);
+    g_timeout_add(2, game_tick, NULL);
+    return FALSE;
+}
+
 static void on_open_game_clicked(GtkButton *button, gpointer user_data) {
     (void)button;
     (void)user_data;
@@ -958,12 +982,10 @@ int main(int argc, char **argv) {
             }
             gtk_widget_hide(main_window);
             touch.was_active = 0;
-            next_game_update_ns = monotonic_ns();
-            draw_game_ui();
-            render_game(1);
-            fprintf(stderr, "NES: game started; entering GTK-integrated emulation loop\n");
+            next_game_update_ns = 0;
+            fprintf(stderr, "NES: game core ready; scheduling initial UI refresh after GTK main loop starts\\n");
             fflush(stderr);
-            g_timeout_add(2, game_tick, NULL);
+            g_idle_add(begin_game_display, NULL);
             gtk_main();
         }
     }
