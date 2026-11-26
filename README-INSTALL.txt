@@ -1,14 +1,16 @@
 KINDLE NES — INSTALLATION
 =========================
 
-VERSION 0.1.8 — CLEANER TOUCH CONTROLS AND SCREEN LAYOUT
+VERSION 0.1.9 — CORRECT TEXT ORIENTATION AND INITIAL REFRESH
 --------------------------------------------------------
 The in-game top bar provides BACK (return to the emulator window), MENU
 (Resume / Back to Library / Quit Emulator), and PAUSE/RESUME. The main-window
 Options information dialog is non-modal. The game viewport starts below the
 toolbar so gameplay refreshes cannot overwrite the top-bar labels. D-pad
 direction letters sit inside their respective arms, and SELECT/START are
-larger, centered high-contrast buttons.
+larger, centered high-contrast buttons. The bitmap font bit order is corrected
+so all overlay labels display upright. The initial game image and controls are
+composed into one full-screen refresh to avoid a stale controller area.
 
 This build logs the selected touchscreen's name and capabilities, the first
 64 raw evdev events, and the first 32 mapped touch reports to
