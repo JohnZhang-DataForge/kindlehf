@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include "file_picker.h"
 #include "rom_compat.h"
+#include "framebuffer_blit.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -13,6 +14,8 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <linux/fb.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -27,6 +30,10 @@
 static int fbfd = FBFD_AUTO;
 static FBInkConfig fb_cfg;
 static FBInkState fb_state;
+static uint8_t *fb_mem;
+static size_t fb_mem_len;
+static uint32_t fb_line_length, fb_xoffset, fb_yoffset;
+static unsigned display_submit_count;
 static int screen_w, screen_h;
 static uint8_t *screen_buf, *game_buf;
 static int game_x, game_y, game_w, game_h;
@@ -139,11 +146,38 @@ static void center_text(uint8_t *buf, int w, int h, int y, const char *s, int sc
 
 static int show_raw(uint8_t *buf, int w, int h, int x, int y, WFM_MODE_INDEX_T waveform) {
     FBInkConfig cfg = fb_cfg;
-    cfg.ignore_alpha = true;
+    int rc;
+
+    if (!fb_mem || fb_state.bpp != 8) {
+        errno = ENODEV;
+        fprintf(stderr, "NES: framebuffer is not mapped for 8-bpp output\n");
+        return -1;
+    }
+    if (nes_blit_gray8(fb_mem, fb_mem_len, fb_line_length, fb_xoffset, fb_yoffset,
+                       (uint32_t)screen_w, (uint32_t)screen_h, buf, w, h, x, y,
+                       fb_state.inverted_grayscale) < 0) {
+        fprintf(stderr, "NES: direct framebuffer copy failed: %s\n", strerror(errno));
+        fflush(stderr);
+        return -1;
+    }
+
+    /* FBInk's Kindle firmware build is MINIMAL and compiles image blitting out.
+       Copy pixels ourselves, then ask FBInk only to submit the e-ink refresh. */
     cfg.is_flashing = false;
     cfg.wfm_mode = waveform;
-    return fbink_print_raw_data(fbfd, buf, w, h, (size_t)w * (size_t)h,
-                                (short)x, (short)y, &cfg);
+    rc = fbink_refresh(fbfd, (uint32_t)y, (uint32_t)x, (uint32_t)w, (uint32_t)h, &cfg);
+    if (rc < 0) {
+        fprintf(stderr, "NES: framebuffer refresh failed (%d): %s\n", rc, strerror(errno));
+        fflush(stderr);
+        return rc;
+    }
+    if (display_submit_count < 3) {
+        fprintf(stderr, "NES: framebuffer refresh submitted rect=%d,%d %dx%d waveform=%d\n",
+                x, y, w, h, (int)waveform);
+        fflush(stderr);
+    }
+    display_submit_count++;
+    return rc;
 }
 
 static int path_within_root(const char *path, const char *root) {
@@ -647,7 +681,7 @@ int main(int argc, char **argv) {
     fb_cfg.wfm_mode = WFM_GC16;
     fbfd = fbink_open();
     if (fbfd < 0 || fbink_init(fbfd, &fb_cfg) < 0) {
-        fprintf(stderr, "FBInk initialization failed\n");
+        fprintf(stderr, "FBInk initialization failed: %s\n", strerror(errno));
         return 2;
     }
     memset(&fb_state, 0, sizeof(fb_state));
@@ -664,8 +698,51 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    {
+        struct fb_fix_screeninfo finfo;
+        struct fb_var_screeninfo vinfo;
+        memset(&finfo, 0, sizeof(finfo));
+        memset(&vinfo, 0, sizeof(vinfo));
+        if (ioctl(fbfd, FBIOGET_FSCREENINFO, &finfo) < 0 ||
+            ioctl(fbfd, FBIOGET_VSCREENINFO, &vinfo) < 0) {
+            fprintf(stderr, "NES: framebuffer info query failed: %s\n", strerror(errno));
+            fbink_close(fbfd);
+            return 2;
+        }
+        if (vinfo.bits_per_pixel != 8 || fb_state.bpp != 8 ||
+            finfo.line_length == 0 || finfo.smem_len == 0) {
+            fprintf(stderr, "NES: unsupported framebuffer format: vinfo=%u bpp, FBInk=%u bpp, stride=%u, memory=%u\n",
+                    vinfo.bits_per_pixel, fb_state.bpp, finfo.line_length, finfo.smem_len);
+            fbink_close(fbfd);
+            return 2;
+        }
+        fb_line_length = finfo.line_length;
+        fb_xoffset = vinfo.xoffset + fb_state.view_hori_origin;
+        fb_yoffset = vinfo.yoffset + fb_state.view_vert_origin;
+        fb_mem_len = finfo.smem_len;
+        if ((uint64_t)fb_xoffset + (uint32_t)screen_w > fb_line_length) {
+            fprintf(stderr, "NES: framebuffer stride too small for view (%u + %d > %u)\n",
+                    fb_xoffset, screen_w, fb_line_length);
+            fbink_close(fbfd);
+            return 2;
+        }
+        fb_mem = (uint8_t *)mmap(NULL, fb_mem_len, PROT_READ | PROT_WRITE,
+                                 MAP_SHARED, fbfd, 0);
+        if (fb_mem == MAP_FAILED) {
+            fb_mem = NULL;
+            fprintf(stderr, "NES: framebuffer mmap failed: %s\n", strerror(errno));
+            fbink_close(fbfd);
+            return 2;
+        }
+        fprintf(stderr, "NES: framebuffer mapped %dx%d 8bpp stride=%u bytes=%lu offset=%u,%u inverted=%d\n",
+                screen_w, screen_h, fb_line_length, (unsigned long)fb_mem_len,
+                fb_xoffset, fb_yoffset, fb_state.inverted_grayscale);
+        fprintf(stderr, "NES: using direct framebuffer copy + FBInk refresh (image blitter not required)\n");
+        fflush(stderr);
+    }
+
     screen_buf = (uint8_t *)malloc((size_t)screen_w * screen_h);
-    if (!screen_buf) { fbink_close(fbfd); return 2; }
+    if (!screen_buf) { munmap(fb_mem, fb_mem_len); fb_mem = NULL; fbink_close(fbfd); return 2; }
     game_w = screen_w - 40;
     game_h = game_w * 240 / 256;
     if (game_h > screen_h - 260) { game_h = screen_h - 260; game_w = game_h * 256 / 240; }
@@ -678,7 +755,7 @@ int main(int argc, char **argv) {
         game_x = (screen_w - game_w) / 2;
     }
     game_buf = (uint8_t *)malloc((size_t)game_w * game_h);
-    if (!game_buf) { free(screen_buf); fbink_close(fbfd); return 2; }
+    if (!game_buf) { free(screen_buf); munmap(fb_mem, fb_mem_len); fb_mem = NULL; fbink_close(fbfd); return 2; }
 
     main_window = create_main_window();
     fprintf(stderr, "NES: main window ready; waiting for Open Game\n");
@@ -742,6 +819,7 @@ int main(int argc, char **argv) {
     if (touch.fd >= 0) close(touch.fd);
     if (main_window) gtk_widget_destroy(main_window);
     fbink_cls(fbfd, &fb_cfg, NULL, false);
+    if (fb_mem) { munmap(fb_mem, fb_mem_len); fb_mem = NULL; }
     fbink_close(fbfd);
     free(game_buf);
     free(screen_buf);
