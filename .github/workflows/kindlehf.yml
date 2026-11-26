@@ -1,0 +1,72 @@
+name: KindleHF build and package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-kindlehf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git curl zstd file binutils zip python3
+
+      - name: Host-side NES core and controller tests
+        run: |
+          mkdir -p build/host
+          git clone https://github.com/xboot/libxnes vendor/libxnes
+          git -C vendor/libxnes checkout --detach 45cab8022732542d0a8c6eddd4fb26c393744afe
+          python3 tests/make_mapper0_rom.py build/host/homebrew-mapper0.nes
+          mapfile -t XNES_SOURCES < <(find vendor/libxnes/src -type f -name '*.c' -print | sort)
+          gcc -std=gnu11 -O2 -Wall -Wextra \
+            -Ivendor/libxnes/src tests/test_core.c "\${XNES_SOURCES[@]}" \
+            -lm -o build/host/test_core
+          build/host/test_core build/host/homebrew-mapper0.nes
+          sh -n "documents/NES Emulator.sh"
+
+      - name: Cross-compile and verify KindleHF executable
+        run: ./build.sh
+
+      - name: Assemble installation and source archives
+        run: |
+          PKG="$PWD/dist/package"
+          mkdir -p "$PKG/documents" "$PKG/nes/bin" "$PKG/nes/roms" "$PKG/nes/saves"
+          install -m 0755 "documents/NES Emulator.sh" "$PKG/documents/NES Emulator.sh"
+          install -m 0755 dist/nes "$PKG/nes/bin/nes"
+          cp README-INSTALL.txt "$PKG/README-INSTALL.txt"
+          cp nes/roms/README.txt "$PKG/nes/roms/README.txt"
+          cp nes/saves/README.txt "$PKG/nes/saves/README.txt"
+          (cd "$PKG" && zip -qr ../Kindle-NES-Install.zip .)
+          tar --exclude='./vendor' --exclude='./build' --exclude='./dist' \
+            --exclude='./.git' -czf dist/Kindle-NES-Source.tar.gz .
+          (cd dist && sha256sum Kindle-NES-Install.zip Kindle-NES-Source.tar.gz nes > SHA256SUMS)
+          ls -lh dist/Kindle-NES-Install.zip dist/Kindle-NES-Source.tar.gz dist/nes
+
+      - name: Upload Kindle installation ZIP and build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kindle-nes-install-\${{ github.sha }}
+          path: |
+            dist/Kindle-NES-Install.zip
+            dist/Kindle-NES-Source.tar.gz
+            dist/SHA256SUMS
+            dist/nes
+            dist/nes.sha256
+            dist/elf-header.txt
+            dist/elf-attributes.txt
+            dist/elf-program-headers.txt
+            dist/elf-dynamic.txt
+          if-no-files-found: error
+          retention-days: 30
