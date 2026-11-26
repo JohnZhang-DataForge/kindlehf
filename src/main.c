@@ -756,7 +756,7 @@ static gboolean begin_game_display(gpointer user_data) {
         for (y = screen_h * 70 / 100; y < screen_h; y++)
             for (x = 0; x < screen_w; x++)
                 if (screen_buf[(size_t)y * screen_w + x] < 128) dark++;
-        fprintf(stderr, "NES: initial controller buffer verified dark_pixels=%lu region_y=%d..%d\\n",
+        fprintf(stderr, "NES: initial controller buffer verified dark_pixels=%lu region_y=%d..%d\n",
                 dark, screen_h * 70 / 100, screen_h - 1);
     }
     fprintf(stderr, "NES: initial UI composed inside GTK main loop\n");
