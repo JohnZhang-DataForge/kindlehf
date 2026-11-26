@@ -96,7 +96,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.9 — prerelease
+          ## Kindle NES v0.1.10 — prerelease
 
           Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker with responsive in-game event loop for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
@@ -122,6 +122,7 @@ jobs:
           - GTK2/GLib/GDK libraries are dynamically linked from Kindle firmware and are not bundled.
 
           ### Touchscreen controls and exit/menu behavior
+          - Fixed first-launch controller invisibility on Kindle e-ink: after a GC16 refresh is submitted, the frontend now calls FBInk's fbink_wait_for_complete with marker 0 (the latest update) before allowing the next update. This fences the initial full-screen controller/game refresh against the first A2 partial game frame, preventing the EPDC from merging or superseding them.
           - Fixed the custom 5x7 bitmap font row order. The previous bit shift rendered every game-overlay label vertically inverted; BACK, MENU, PAUSE/RESUME, D-pad directions, A/B, SELECT/START, and game-menu labels now use the correct orientation.
           - ROM launch now composes the game image and controller overlay into one framebuffer and submits one full-screen GC16 refresh. This avoids issuing a full-screen UI refresh immediately followed by a separate partial game refresh, which could leave the controller area stale until another touch event.
           - The game overlay now has large BACK, MENU, and PAUSE/RESUME touch targets in the top bar, plus a visible D-pad, A/B, SELECT, and START pad.
@@ -166,12 +167,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.9 >/dev/null 2>&1; then
-            gh release upload v0.1.9 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.10 >/dev/null 2>&1; then
+            gh release upload v0.1.10 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.9 "${ASSETS[@]}" \
+            gh release create v0.1.10 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.9" \
+              --title "Kindle NES v0.1.10" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
