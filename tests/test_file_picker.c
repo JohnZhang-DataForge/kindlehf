@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
     }
     g_strlcpy(current, root, sizeof(current));
     g_timeout_add(150, inspect_and_cancel, &test);
-    selected = nes_file_picker_run(root, current, sizeof(current));
+    selected = nes_file_picker_run(NULL, root, current, sizeof(current));
 
     if (selected) g_free(selected);
     if (!test.found_tree || !test.saw_directory_first || !test.saw_nes_file ||
