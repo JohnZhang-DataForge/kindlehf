@@ -178,6 +178,27 @@ static int show_raw(uint8_t *buf, int w, int h, int x, int y, WFM_MODE_INDEX_T w
         fflush(stderr);
     }
     display_submit_count++;
+
+    /*
+     * Fence full-quality e-ink updates before allowing subsequent A2 game
+     * frames. On Kindle the EPDC queues/merges updates asynchronously.
+     * Without this wait, the first partial game refresh can race the initial
+     * full-screen GC16 refresh; the controller then appears only after a
+     * later full refresh (e.g. when the user taps PAUSE).
+     *
+     * FBInk documents marker 0 as "the last update submitted by this session".
+     */
+    if (waveform == WFM_GC16) {
+        int wait_rc = fbink_wait_for_complete(fbfd, 0U);
+        if (wait_rc < 0) {
+            fprintf(stderr, "NES: GC16 refresh completion wait returned %d; continuing\\n",
+                    wait_rc);
+            fflush(stderr);
+        } else if (display_submit_count <= 3) {
+            fprintf(stderr, "NES: GC16 refresh completed before next update\\n");
+            fflush(stderr);
+        }
+    }
     return rc;
 }
 
