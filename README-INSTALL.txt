@@ -33,7 +33,7 @@ CONTROLS
 - A/B: lower-right.
 - SELECT/START: lower middle.
 - PAUSE/RESUME: upper-right.
-- EXIT: upper-left, returns to the ROM list.
+- EXIT: upper-left, returns to the file picker in the current folder.
 
 NOTES
 -----
