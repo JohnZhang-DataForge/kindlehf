@@ -25,13 +25,13 @@ jobs:
 
       - name: Host-side NES core and controller tests
         run: |
-          mkdir -p build/host
+          mkdir -p build/host vendor
           git clone https://github.com/xboot/libxnes vendor/libxnes
           git -C vendor/libxnes checkout --detach 45cab8022732542d0a8c6eddd4fb26c393744afe
           python3 tests/make_mapper0_rom.py build/host/homebrew-mapper0.nes
           mapfile -t XNES_SOURCES < <(find vendor/libxnes/src -type f -name '*.c' -print | sort)
           gcc -std=gnu11 -O2 -Wall -Wextra \
-            -Ivendor/libxnes/src tests/test_core.c "\${XNES_SOURCES[@]}" \
+            -Ivendor/libxnes/src tests/test_core.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_core
           build/host/test_core build/host/homebrew-mapper0.nes
           sh -n "documents/NES Emulator.sh"
@@ -57,7 +57,7 @@ jobs:
       - name: Upload Kindle installation ZIP and build evidence
         uses: actions/upload-artifact@v4
         with:
-          name: kindle-nes-install-\${{ github.sha }}
+          name: kindle-nes-install-${{ github.sha }}
           path: |
             dist/Kindle-NES-Install.zip
             dist/Kindle-NES-Source.tar.gz
