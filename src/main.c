@@ -289,7 +289,7 @@ static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
     GtkWidget *label;
     GtkWidget *area;
 
-    dialog = gtk_dialog_new_with_buttons("NES Emulator", parent, GTK_DIALOG_MODAL,
+    dialog = gtk_dialog_new_with_buttons("NES Emulator", parent, GTK_DIALOG_DESTROY_WITH_PARENT,
                                          "OK", GTK_RESPONSE_OK, NULL);
     area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
     label = gtk_label_new(message ? message : "Unknown error");
@@ -297,7 +297,6 @@ static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
     gtk_misc_set_alignment(GTK_MISC(label), 0.0f, 0.5f);
     gtk_container_set_border_width(GTK_CONTAINER(area), 18);
     gtk_box_pack_start(GTK_BOX(area), label, TRUE, TRUE, 8);
-    gtk_dialog_add_button(GTK_DIALOG(dialog), "OK", GTK_RESPONSE_OK);
     g_signal_connect_swapped(dialog, "response",
                              G_CALLBACK(gtk_widget_destroy), dialog);
     gtk_widget_show_all(dialog);
@@ -731,18 +730,31 @@ static gboolean game_tick(gpointer user_data) {
  * immediately after the ROM picker returned; a later PAUSE full refresh did.
  */
 static gboolean begin_game_display(gpointer user_data) {
+    int i;
+    uint64_t initial_batch_ns = 0;
     (void)user_data;
     if (!in_game || !nes || quitting) {
         if (gtk_main_level() > 0) gtk_main_quit();
         return FALSE;
     }
 
+    /*
+     * Advance the PPU before sampling its front buffer. The old startup path
+     * rendered before the first xnes_step_frame(), so the first framebuffer
+     * image was the core's power-on blank frame (all pixels palette entry 0).
+     */
+    for (i = 0; i < DISPLAY_BATCH_FRAMES; i++) {
+        uint64_t frame_ns = xnes_step_frame(nes);
+        if (frame_ns > 0) initial_batch_ns += frame_ns;
+    }
+    if (initial_batch_ns == 0) initial_batch_ns = 116666667ULL;
+
     draw_game_ui();
-    fprintf(stderr, "NES: initial UI composed inside GTK main loop\\n");
+    fprintf(stderr, "NES: initial UI composed inside GTK main loop\n");
     fflush(stderr);
     render_game(1);
-    next_game_update_ns = monotonic_ns();
-    fprintf(stderr, "NES: initial full-screen game/controller refresh submitted; starting emulation timer\\n");
+    next_game_update_ns = monotonic_ns() + initial_batch_ns;
+    fprintf(stderr, "NES: initial full-screen game/controller refresh submitted; starting emulation timer\n");
     fflush(stderr);
     g_timeout_add(2, game_tick, NULL);
     return FALSE;
