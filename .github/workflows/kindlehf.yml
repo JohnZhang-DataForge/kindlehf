@@ -42,8 +42,8 @@ jobs:
             -Ivendor/libxnes/src tests/test_core.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_core
           build/host/test_core build/host/homebrew-mapper0.nes
-          gcc -std=gnu11 -O2 -Wall -Wextra -Isrc -Ivendor/libxnes/src \\
-            src/rom_compat.c tests/test_rom_compat.c "${XNES_SOURCES[@]}" \\
+          gcc -std=gnu11 -O2 -Wall -Wextra -Isrc -Ivendor/libxnes/src \
+            src/rom_compat.c tests/test_rom_compat.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_rom_compat
           build/host/test_rom_compat
           sh -n "documents/NES Emulator.sh"
