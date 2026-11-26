@@ -13,7 +13,7 @@ INSTALL
    Merge with existing folders if prompted; do not delete existing files.
 3. Keep legally obtained, unmodified NES ROM files anywhere on Kindle USB storage (/mnt/us), including nested folders. You do NOT need to copy them into the emulator folder.
 4. Safely eject the Kindle.
-5. Return to the Kindle library and tap "NES Emulator".
+5. Return to the Kindle library and tap "NES Emulator". The GTK2 main window appears; tap "Open Game" to choose a ROM.
 
 EXPECTED DEVICE PATHS
 ---------------------
@@ -27,10 +27,11 @@ storage may be mounted noexec. It defaults DISPLAY to :0 for the Kindle GTK2 win
 
 CONTROLS
 --------
-- The GTK2 ROM picker follows the Gambatte-K2 interface: Cancel + current path at the top, scrollable file list, parent row (..), folders first, then .nes files.
+- Main window: Open Game, Options, Fullscreen, and Quit.
+- Open Game opens the Gambatte-K2-style picker: Cancel + current path at the top, scrollable file list, parent row (..), folders first, then .nes files.
 - Drag the list to scroll; tap a folder to enter it; tap a .nes file to launch it.
 - The picker starts at /mnt/us and remembers the last directory when returning from a game.
-- Cancel closes the emulator.
+- Cancel returns to the main window.
 - D-pad: lower-left.
 - A/B: lower-right.
 - SELECT/START: lower middle.
