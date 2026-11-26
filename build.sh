@@ -49,7 +49,7 @@ mapfile -t XNES_SOURCES < <(find vendor/libxnes/src -type f -name '*.c' -print |
 test "${#XNES_SOURCES[@]}" -gt 0
 
 "$CC" -std=gnu11 -O2 -DNDEBUG -DPLATFORM_KINDLE \
-    -march=armv7-a -mtune=cortex-a8 -mfpu=neon -mfloat-abi=hard -mthumb \
+    -march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb \
     -fomit-frame-pointer -fno-strict-aliasing -ffunction-sections -fdata-sections \
     -Wall -Wextra \
     -Ivendor/FBInk -Ivendor/libxnes/src \
