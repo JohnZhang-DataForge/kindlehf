@@ -264,7 +264,7 @@ static gboolean on_tree_button_release(GtkWidget *widget, GdkEventButton *event,
     return TRUE;
 }
 
-char *nes_file_picker_run(const char *root_dir, char *current_dir, size_t current_dir_size) {
+char *nes_file_picker_run(GtkWindow *parent, const char *root_dir, char *current_dir, size_t current_dir_size) {
     NesPicker picker;
     GtkWidget *main_vbox;
     GtkWidget *top_hbox;
@@ -290,6 +290,7 @@ char *nes_file_picker_run(const char *root_dir, char *current_dir, size_t curren
     picker.window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(picker.window),
                          "L:A_N:application_ID:nes_PC:N_O:URL_DM:PZ_O:U");
+    if (parent) gtk_window_set_transient_for(GTK_WINDOW(picker.window), parent);
     gtk_window_set_default_size(GTK_WINDOW(picker.window), 600, 760);
     gtk_window_set_position(GTK_WINDOW(picker.window), GTK_WIN_POS_CENTER);
     gtk_window_set_modal(GTK_WINDOW(picker.window), TRUE);
