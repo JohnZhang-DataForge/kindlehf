@@ -311,6 +311,8 @@ static void render_game(void) {
     static const uint8_t bayer[4][4] = {
         {0,8,2,10}, {12,4,14,6}, {3,11,1,9}, {15,7,13,5}
     };
+    static unsigned rendered_frames;
+    unsigned int min_gray = 255, max_gray = 0, dark_pixels = 0;
     int x, y;
     for (y = 0; y < game_h; y++) {
         int sy = y * 240 / game_h;
@@ -319,9 +321,19 @@ static void render_game(void) {
             unsigned int r = (p >> 16) & 255, g = (p >> 8) & 255, b = p & 255;
             unsigned int gray = (r*30 + g*59 + b*11) / 100;
             unsigned int threshold = (unsigned int)bayer[y & 3][x & 3] * 16u + 8u;
+            if (gray < min_gray) min_gray = gray;
+            if (gray > max_gray) max_gray = gray;
+            if (gray < 240) dark_pixels++;
             game_buf[(size_t)y * game_w + x] = (gray > threshold) ? 255 : 0;
         }
     }
+    if (rendered_frames < 3) {
+        fprintf(stderr, "NES: rendered frame %u pixels=%dx%d grayscale=%u..%u nonwhite=%u/%u\\n",
+                rendered_frames + 1, game_w, game_h, min_gray, max_gray, dark_pixels,
+                (unsigned)(game_w * game_h));
+        fflush(stderr);
+    }
+    rendered_frames++;
     show_raw(game_buf, game_w, game_h, game_x, game_y, WFM_A2);
     if (paused) {
         uint8_t overlay[250 * 84];
