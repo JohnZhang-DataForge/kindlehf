@@ -37,7 +37,7 @@ jobs:
           sh -n "documents/NES Emulator.sh"
 
       - name: Cross-compile and verify KindleHF executable
-        run: ./build.sh
+        run: bash ./build.sh
 
       - name: Assemble installation and source archives
         run: |
