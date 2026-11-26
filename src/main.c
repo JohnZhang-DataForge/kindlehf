@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <gtk/gtk.h>
 #include "file_picker.h"
+#include "rom_compat.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -150,93 +151,78 @@ static int path_within_root(const char *path, const char *root) {
     return strncmp(path, root, n) == 0 && (path[n] == '\0' || path[n] == '/');
 }
 
-static const char *validate_ines_rom(const uint8_t *data, size_t len) {
-    size_t required, trainer;
-    if (!data || len < 16) return "file is shorter than the 16-byte iNES header";
-    if (data[0] != 'N' || data[1] != 'E' || data[2] != 'S' || data[3] != 0x1a)
-        return "file does not have the NES\x1A signature";
-    if ((data[7] & 0x0c) == 0x08)
-        return "NES 2.0 format is not supported by the bundled libxnes core yet";
-    if ((data[7] & 0x0c) != 0)
-        return "header uses an unsupported/reserved format marker";
-    if (data[4] == 0) return "ROM contains no PRG-ROM banks";
-    if (data[5] == 0)
-        return "ROM uses CHR-RAM only; this build currently requires CHR-ROM";
-    trainer = (data[6] & 0x04) ? 512u : 0u;
-    required = 16u + trainer + (size_t)data[4] * 16384u + (size_t)data[5] * 8192u;
-    if (len < required)
-        return "ROM data is truncated (file is smaller than its iNES header declares)";
-    return NULL;
-}
-
 static int load_rom_path(const char *path, char *error, size_t error_size) {
     FILE *f;
     long len = -1;
     uint8_t *data;
-    const char *validation_error;
+    uint8_t *core_data = NULL;
+    size_t core_size = 0;
+    int normalized = 0;
+    unsigned mapper = 0;
 
-    if (error && error_size) error[0] = '\0';
-    fprintf(stderr, "NES: opening ROM: %s\n", path ? path : "(null)");
+    if (error && error_size) error[0] = '\\0';
+    fprintf(stderr, "NES: opening ROM: %s\\n", path ? path : "(null)");
     fflush(stderr);
     f = fopen(path, "rb");
     if (!f) {
         if (error && error_size) snprintf(error, error_size, "Cannot open ROM: %s", strerror(errno));
-        fprintf(stderr, "NES: ROM open failed: %s\n", strerror(errno));
+        fprintf(stderr, "NES: ROM open failed: %s\\n", strerror(errno));
         return -1;
     }
     if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 16 ||
         len > 64L*1024L*1024L || fseek(f, 0, SEEK_SET) != 0) {
         if (error && error_size) snprintf(error, error_size, "ROM file size is invalid or exceeds 64 MB.");
-        fprintf(stderr, "NES: ROM size/seek check failed (length=%ld)\n", len);
+        fprintf(stderr, "NES: ROM size/seek check failed (length=%ld)\\n", len);
         fclose(f);
         return -1;
     }
-    fprintf(stderr, "NES: ROM size=%ld bytes\n", len);
+    fprintf(stderr, "NES: ROM size=%ld bytes\\n", len);
     data = (uint8_t *)malloc((size_t)len);
     if (!data) {
         if (error && error_size) snprintf(error, error_size, "Not enough memory to read this ROM.");
-        fprintf(stderr, "NES: ROM allocation failed\n");
+        fprintf(stderr, "NES: ROM allocation failed\\n");
         fclose(f);
         return -1;
     }
     if (fread(data, 1, (size_t)len, f) != (size_t)len) {
         if (error && error_size) snprintf(error, error_size, "Could not read the complete ROM file.");
-        fprintf(stderr, "NES: ROM read failed\n");
+        fprintf(stderr, "NES: ROM read failed\\n");
         free(data);
         fclose(f);
         return -1;
     }
     fclose(f);
 
-    validation_error = validate_ines_rom(data, (size_t)len);
-    if (validation_error) {
-        if (error && error_size) snprintf(error, error_size, "%s", validation_error);
-        fprintf(stderr, "NES: ROM rejected: %s (header=%02x %02x %02x %02x %02x %02x %02x %02x)\n",
-                validation_error, data[0], data[1], data[2], data[3],
-                data[4], data[5], data[6], data[7]);
+    fprintf(stderr, "NES: source header=%02x %02x %02x %02x %02x %02x %02x %02x\\n",
+            data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+    if (nes_rom_prepare_for_libxnes(data, (size_t)len, &core_data, &core_size,
+                                    &normalized, &mapper, error, error_size) != 0) {
+        fprintf(stderr, "NES: ROM preparation failed: %s\\n",
+                (error && error_size && error[0]) ? error : "unknown format error");
         free(data);
         return -1;
     }
+    free(data);
+    fprintf(stderr, "NES: prepared ROM mapper=%u size=%lu bytes normalized=%s CHR banks=%u\\n",
+            mapper, (unsigned long)core_size, normalized ? "yes" : "no", core_data[5]);
+    fflush(stderr);
 
-    fprintf(stderr, "NES: iNES mapper=%u PRG=%u x16KB CHR=%u x8KB trainer=%s\n",
-            (unsigned)(((data[6] >> 4) & 0x0f) | (data[7] & 0xf0)),
-            data[4], data[5], (data[6] & 0x04) ? "yes" : "no");
     if (nes) {
         xnes_ctx_free(nes);
         nes = NULL;
     }
-    nes = xnes_ctx_alloc(data, (size_t)len);
-    free(data);
+    nes = xnes_ctx_alloc(core_data, core_size);
+    free(core_data);
     if (!nes) {
         if (error && error_size)
-            snprintf(error, error_size, "The ROM format is valid, but its mapper is unsupported by this emulator.");
-        fprintf(stderr, "NES: libxnes rejected ROM (unsupported mapper or cartridge initialization failure)\n");
+            snprintf(error, error_size, "ROM was normalized, but libxnes does not implement mapper %u or rejected this cartridge.", mapper);
+        fprintf(stderr, "NES: libxnes rejected prepared ROM (mapper=%u)\\n", mapper);
         return -1;
     }
     xnes_set_speed(nes, 1.0f);
     in_game = 1;
     paused = 0;
-    fprintf(stderr, "NES: ROM core initialized successfully\n");
+    fprintf(stderr, "NES: ROM core initialized successfully (mapper=%u)\\n", mapper);
     fflush(stderr);
     return 0;
 }
@@ -252,7 +238,7 @@ static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
     label = gtk_label_new(message ? message : "Unknown error");
     gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
     gtk_misc_set_alignment(GTK_MISC(label), 0.0f, 0.5f);
-    gtk_container_set_border_width(GTK_CONTAINER(label), 18);
+    gtk_container_set_border_width(GTK_CONTAINER(area), 18);
     gtk_box_pack_start(GTK_BOX(area), label, TRUE, TRUE, 8);
     gtk_widget_show_all(dialog);
     gtk_dialog_run(GTK_DIALOG(dialog));
