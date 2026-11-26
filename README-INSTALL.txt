@@ -11,8 +11,7 @@ INSTALL
 1. Connect the Kindle by USB and open its USB storage.
 2. Copy the "documents" and "nes" folders from this ZIP to the Kindle storage root.
    Merge with existing folders if prompted; do not delete existing files.
-3. Copy legally obtained, unmodified NES ROM files ending in .nes into:
-      /mnt/us/nes/roms/
+3. Keep legally obtained, unmodified NES ROM files anywhere on Kindle USB storage (/mnt/us), including nested folders. You do NOT need to copy them into the emulator folder.
 4. Safely eject the Kindle.
 5. Return to the Kindle library and tap "NES Emulator".
 
@@ -20,7 +19,6 @@ EXPECTED DEVICE PATHS
 ---------------------
 /mnt/us/documents/NES Emulator.sh
 /mnt/us/nes/bin/nes
-/mnt/us/nes/roms/
 /mnt/us/nes/saves/
 
 The launcher stages the executable under /var/tmp before running it because USB
@@ -29,7 +27,8 @@ storage may be mounted noexec. Runtime diagnostics are appended to:
 
 CONTROLS
 --------
-- Tap a ROM row to start.
+- Browse folders in the native file picker; tap any .nes file to start.
+- ROOT returns to the Kindle USB storage root; UP goes to the parent folder.
 - D-pad: lower-left.
 - A/B: lower-right.
 - SELECT/START: lower middle.
@@ -62,9 +61,10 @@ Tapping the launcher returns immediately:
   changing ROMs.
 
 ROM does not appear:
-  Confirm the file ends in .nes and is inside nes/roms/.
+  Confirm the file ends in .nes and is somewhere under /mnt/us. Browse into its
+  containing folder. Hidden files and symbolic links are intentionally omitted.
 
-ROM appears but fails to start:
+A ROM appears but fails to start:
   Try the generated mapper-0 test ROM from the repository test suite. Not all
   mappers and cartridge formats are supported.
 
