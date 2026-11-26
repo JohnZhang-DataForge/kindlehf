@@ -25,7 +25,7 @@ The pinned libxnes revision includes mapper implementations for 0, 1, 2, 3, 4, 7
 
 The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolchain, verifies its SHA-256, checks out pinned FBInk and libxnes commits, compiles the ARM executable, verifies ELF/ABI attributes, runs host-side ROM/core/controller tests, and uploads the installation ZIP and source archive.
 
-For a local Linux build: `./build.sh`.
+For a local Linux build: `bash ./build.sh`.
 
 Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
 
