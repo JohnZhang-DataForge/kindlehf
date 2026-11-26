@@ -114,8 +114,8 @@ grep -q 'Tag_Advanced_SIMD_arch: NEONv1' dist/elf-attributes.txt
 grep -q 'Tag_ABI_VFP_args: VFP registers' dist/elf-attributes.txt
 grep -q 'INTERP' dist/elf-program-headers.txt
 grep -q 'Requesting program interpreter: /lib/ld-linux-armhf.so.3' dist/elf-program-headers.txt
-grep -q 'Shared library: \\[libgtk-x11-2.0.so.0\\]' dist/elf-dynamic.txt
-grep -q 'Shared library: \\[libgdk-x11-2.0.so.0\\]' dist/elf-dynamic.txt
+grep -Fq 'Shared library: [libgtk-x11-2.0.so.0]' dist/elf-dynamic.txt
+grep -Fq 'Shared library: [libgdk-x11-2.0.so.0]' dist/elf-dynamic.txt
 
 # Every direct ELF dependency must exist in the firmware-derived Kindle sysroot.
 while read -r needed; do
@@ -124,7 +124,7 @@ while read -r needed; do
         echo "Unresolved Kindle runtime dependency: $needed" >&2
         exit 1
     fi
-done < <(sed -n 's/.*Shared library: \\[\\(.*\\)\\].*/\\1/p' dist/elf-dynamic.txt)
+done < <(awk -F'[][]' '/Shared library:/ {print $2}' dist/elf-dynamic.txt)
 
 sha256sum dist/nes | tee dist/nes.sha256
 echo "KindleHF executable build and ELF ABI checks passed."
