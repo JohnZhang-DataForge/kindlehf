@@ -14,6 +14,9 @@ composed into one full-screen refresh. The app now waits for the Kindle EPDC
 to complete each GC16 refresh before sending subsequent A2 partial game frames.
 This prevents the first partial update from racing the initial controller
 refresh, which previously made the controls appear only after tapping PAUSE.
+Build: KindleHF ARM hard-float; initial GC16 completion is now explicitly
+fenced before the first A2 gameplay update. See nes.log for the
+"GC16 refresh completed before next update" diagnostic.
 
 This build logs the selected touchscreen's name and capabilities, the first
 64 raw evdev events, and the first 32 mapped touch reports to
