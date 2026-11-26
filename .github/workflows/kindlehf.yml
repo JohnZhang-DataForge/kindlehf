@@ -41,6 +41,7 @@ jobs:
 
       - name: Assemble installation and source archives
         run: |
+          printf 'libxnes=45cab8022732542d0a8c6eddd4fb26c393744afe\nFBInk=bab62e96716ef978dab52048eb4d1c79a8eecfa7\n' > vendor/UPSTREAM_VERSIONS.txt
           tar --exclude-vcs --exclude='./build' --exclude='./dist' \
             -czf dist/Kindle-NES-Source.tar.gz .
           PKG="$PWD/dist/package"
