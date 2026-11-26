@@ -1,4 +1,7 @@
 #!/bin/sh
+# Name: NES Emulator
+# Author: Kindle NES Project
+# DontUseFBInk
 # Kindle SH Integration scriptlet. Place this file in /mnt/us/documents/.
 # Native KindleHF executable; no KUAL, KPM, browser, HTML, or JavaScript.
 
