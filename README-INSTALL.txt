@@ -36,7 +36,7 @@ CONTROLS
 - A/B: lower-right.
 - SELECT/START: lower middle.
 - PAUSE/RESUME: upper-right.
-- EXIT: upper-left, returns to the file picker in the current folder.
+- EXIT: upper-left, returns to the GTK2 main window. Tap Open Game to select another ROM.
 
 NOTES
 -----
