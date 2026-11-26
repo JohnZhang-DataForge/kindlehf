@@ -51,8 +51,10 @@ Launcher is visible but reports a missing binary:
   Check that nes/bin/nes exists and is executable after copying.
 
 Tapping the launcher returns immediately:
-  Inspect /mnt/us/nes/nes.log. Confirm SH Integration is installed and that
-  the device has permission to access /dev/fb0 and /dev/input/event*.
+  Inspect /mnt/us/nes/nes.log. Confirm SH Integration is installed and its
+  Gandalf/su privilege helper is functional. SH Integration normally launches
+  scriptlets through its setuid helper; do not manually chmod or replace that
+  system helper. The emulator needs framebuffer and evdev access.
 
 "TOUCH INPUT NOT FOUND":
   The frontend could not find a compatible evdev touchscreen. Device-specific
