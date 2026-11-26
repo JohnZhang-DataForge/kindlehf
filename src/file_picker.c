@@ -35,7 +35,6 @@ typedef struct {
     char *pressed_path;
     double press_y;
     double last_y;
-    gboolean pressed_is_directory;
     gboolean dragging;
     gboolean finished;
 } NesPicker;
@@ -88,7 +87,6 @@ static gboolean row_at_event(NesPicker *picker, GdkEventButton *event,
                            COL_IS_DIRECTORY, &is_dir, -1);
     }
     gtk_tree_path_free(tree_path);
-    if (column) g_object_unref(column);
     if (!full) return FALSE;
 
     if (full_path) *full_path = full;
@@ -191,17 +189,15 @@ static gboolean on_tree_scroll(GtkWidget *widget, GdkEventScroll *event, gpointe
 static gboolean on_tree_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data) {
     NesPicker *picker = (NesPicker *)user_data;
     char *full = NULL;
-    gboolean is_dir = FALSE;
     (void)widget;
 
     if (event->button != 1) return FALSE;
     g_free(picker->pressed_path);
     picker->pressed_path = NULL;
-    picker->pressed_is_directory = FALSE;
     picker->press_y = event->y;
     picker->last_y = event->y;
     picker->dragging = FALSE;
-    if (row_at_event(picker, event, &full, &is_dir)) {
+    if (row_at_event(picker, event, &full, NULL)) {
         picker->pressed_path = full;
         picker->pressed_is_directory = is_dir;
     }
@@ -304,6 +300,7 @@ char *nes_file_picker_run(const char *root_dir, char *current_dir, size_t curren
     gtk_box_pack_start(GTK_BOX(main_vbox), top_hbox, FALSE, FALSE, 0);
 
     cancel_button = gtk_button_new_with_label("cancel");
+    gtk_widget_set_name(cancel_button, "nes-file-picker-cancel");
     gtk_box_pack_start(GTK_BOX(top_hbox), cancel_button, FALSE, FALSE, 0);
     g_signal_connect(cancel_button, "clicked", G_CALLBACK(on_cancel_clicked), &picker);
 
@@ -320,6 +317,7 @@ char *nes_file_picker_run(const char *root_dir, char *current_dir, size_t curren
 
     picker.store = gtk_list_store_new(N_COLUMNS, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_BOOLEAN);
     picker.tree = gtk_tree_view_new_with_model(GTK_TREE_MODEL(picker.store));
+    gtk_widget_set_name(picker.tree, "nes-file-picker-tree");
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(picker.tree), FALSE);
     gtk_tree_view_set_rules_hint(GTK_TREE_VIEW(picker.tree), FALSE);
     gtk_tree_selection_set_mode(
