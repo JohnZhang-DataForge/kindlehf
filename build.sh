@@ -67,6 +67,8 @@ file dist/nes
 
 grep -q 'Machine:.*ARM' dist/elf-header.txt
 grep -Eq 'Version5 EABI|EABI5' dist/elf-header.txt
+grep -q 'Tag_CPU_arch: v7' dist/elf-attributes.txt
+grep -q 'Tag_Advanced_SIMD_arch: NEONv1' dist/elf-attributes.txt
 grep -q 'Tag_ABI_VFP_args: VFP registers' dist/elf-attributes.txt
 if grep -q 'INTERP' dist/elf-program-headers.txt; then
     echo "Unexpected dynamic interpreter in supposedly static executable" >&2
