@@ -7,12 +7,12 @@
 
 APPDIR="/mnt/us/nes"
 BIN="$APPDIR/bin/nes"
-ROMDIR="$APPDIR/roms"
+BROWSE_ROOT="/mnt/us"
 TMPDIR="${TMPDIR:-/var/tmp}"
 TMPBIN="$TMPDIR/kindle-nes-$$"
 LOG="$APPDIR/nes.log"
 
-mkdir -p "$ROMDIR" "$APPDIR/saves" "$APPDIR/bin"
+mkdir -p "$APPDIR/saves" "$APPDIR/bin"
 
 if [ ! -f "$BIN" ]; then
     echo "NES Emulator: executable not found."
@@ -39,6 +39,6 @@ if ! cp "$BIN" "$TMPBIN" || ! chmod 700 "$TMPBIN"; then
 fi
 
 cd "$APPDIR" || exit 1
-"$TMPBIN" "$ROMDIR" >>"$LOG" 2>&1
+"$TMPBIN" "$BROWSE_ROOT" >>"$LOG" 2>&1
 RC=$?
 exit "$RC"
