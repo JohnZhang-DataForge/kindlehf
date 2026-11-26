@@ -4,7 +4,7 @@ import pathlib
 import sys
 
 out = pathlib.Path(sys.argv[1])
-header = bytearray(b"NES\\x1a" + bytes([1, 1, 0, 0]) + bytes(8))
+header = bytearray(b"NES\x1a" + bytes([1, 1, 0, 0]) + bytes(8))
 prg = bytearray([0xEA] * 0x4000)
 program = bytes([
     0x78, 0xD8,
