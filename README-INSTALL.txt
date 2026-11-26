@@ -21,9 +21,11 @@ fenced before the first A2 gameplay update. See nes.log for the
 "GC16 refresh completed before next update" diagnostic.
 
 Mapper support includes the standard BMC 1200-in-1 iNES Mapper 227
-address-latch board (16K/32K PRG modes, mirroring, and fixed 8K CHR-RAM).
-The separate Mapper 227 battery-WRAM variants are not claimed as supported.
-A host regression test covers Mapper 227 bank selection and CHR-RAM access.
+address-latch board (16K/32K PRG modes, fixed high-bank modes, mirroring,
+and fixed 8K CHR-RAM with the board's O-bit write protection). The separate
+Mapper 227 battery-WRAM variants are not claimed as supported. A host
+regression test covers Mapper 227 bank selection, mirroring, CHR-RAM access
+and write protection.
 
 This build logs the selected touchscreen's name and capabilities, the first
 64 raw evdev events, and the first 32 mapped touch reports to
