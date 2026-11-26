@@ -50,3 +50,8 @@ See `README-INSTALL.txt` in the installation ZIP for installation and recovery s
 ## ROM loading troubleshooting
 
 The emulator writes the selected ROM path, file size, iNES header, mapper, validation result, and cartridge-core initialization result to `/mnt/us/nes/nes.log`. Unsupported NES 2.0 headers, CHR-RAM-only images, truncated files, and unsupported mappers are reported explicitly. Error dialogs use plain text rather than stock theme icons because Kindle GTK themes may not provide those icons.
+
+
+## NES 2.0 and CHR-RAM compatibility
+
+The frontend normalizes basic NES 2.0 headers that use 8-bit linear PRG/CHR bank counts and no submapper or extended mapper ID. Cartridges without CHR-ROM receive writable compatibility CHR memory for the bundled libxnes mapper implementations. Extended/exponent ROM sizes, extended mapper IDs, and nonzero submappers remain unsupported. Host CI includes a synthetic NES 2.0 MMC1/CHR-RAM cartridge test that loads the core, verifies CHR writes, and steps a frame.
