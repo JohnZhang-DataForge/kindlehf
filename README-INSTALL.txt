@@ -1,7 +1,7 @@
 KINDLE NES — INSTALLATION
 =========================
 
-VERSION 0.1.10 — WAIT FOR INITIAL E-INK REFRESH
+VERSION 0.1.11 — FIRST-SCREEN STARTUP AND MAPPER 227
 --------------------------------------------------------
 The in-game top bar provides BACK (return to the emulator window), MENU
 (Resume / Back to Library / Quit Emulator), and PAUSE/RESUME. The main-window
@@ -10,13 +10,20 @@ toolbar so gameplay refreshes cannot overwrite the top-bar labels. D-pad
 direction letters sit inside their respective arms, and SELECT/START are
 larger, centered high-contrast buttons. The bitmap font bit order is corrected
 so all overlay labels display upright. The initial game image and controls are
-composed into one full-screen refresh. The app now waits for the Kindle EPDC
-to complete each GC16 refresh before sending subsequent A2 partial game frames.
-This prevents the first partial update from racing the initial controller
-refresh, which previously made the controls appear only after tapping PAUSE.
+composed into one full-screen refresh. The first game/controller frame is now scheduled from a GTK idle callback
+after the GTK main loop starts, rather than being drawn immediately after the
+ROM picker returns. The core advances seven NES frames before the first
+framebuffer capture so the PPU front buffer is not sampled at power-on blank.
+The app also waits for the Kindle EPDC to complete each GC16 refresh before
+sending subsequent A2 partial game frames.
 Build: KindleHF ARM hard-float; initial GC16 completion is now explicitly
 fenced before the first A2 gameplay update. See nes.log for the
 "GC16 refresh completed before next update" diagnostic.
+
+Mapper support includes the standard BMC 1200-in-1 iNES Mapper 227
+address-latch board (16K/32K PRG modes, mirroring, and fixed 8K CHR-RAM).
+The separate Mapper 227 battery-WRAM variants are not claimed as supported.
+A host regression test covers Mapper 227 bank selection and CHR-RAM access.
 
 This build logs the selected touchscreen's name and capabilities, the first
 64 raw evdev events, and the first 32 mapped touch reports to
