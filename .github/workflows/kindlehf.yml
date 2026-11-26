@@ -41,16 +41,19 @@ jobs:
 
       - name: Assemble installation and source archives
         run: |
+          tar --exclude-vcs --exclude='./build' --exclude='./dist' \
+            -czf dist/Kindle-NES-Source.tar.gz .
           PKG="$PWD/dist/package"
-          mkdir -p "$PKG/documents" "$PKG/nes/bin" "$PKG/nes/roms" "$PKG/nes/saves"
+          mkdir -p "$PKG/documents" "$PKG/nes/bin" "$PKG/nes/roms" "$PKG/nes/saves" "$PKG/THIRD_PARTY_LICENSES"
           install -m 0755 "documents/NES Emulator.sh" "$PKG/documents/NES Emulator.sh"
           install -m 0755 dist/nes "$PKG/nes/bin/nes"
           cp README-INSTALL.txt "$PKG/README-INSTALL.txt"
+          cp COPYING LICENSE-NOTES.txt "$PKG/"
+          cp THIRD_PARTY_LICENSES/libxnes-MIT.txt "$PKG/THIRD_PARTY_LICENSES/"
           cp nes/roms/README.txt "$PKG/nes/roms/README.txt"
           cp nes/saves/README.txt "$PKG/nes/saves/README.txt"
+          cp dist/Kindle-NES-Source.tar.gz "$PKG/Kindle-NES-Source.tar.gz"
           (cd "$PKG" && zip -qr ../Kindle-NES-Install.zip .)
-          tar --exclude='./vendor' --exclude='./build' --exclude='./dist' \
-            --exclude='./.git' -czf dist/Kindle-NES-Source.tar.gz .
           (cd dist && sha256sum Kindle-NES-Install.zip Kindle-NES-Source.tar.gz nes > SHA256SUMS)
           ls -lh dist/Kindle-NES-Install.zip dist/Kindle-NES-Source.tar.gz dist/nes
 
