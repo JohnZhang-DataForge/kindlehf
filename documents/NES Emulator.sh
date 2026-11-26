@@ -25,7 +25,10 @@ fi
 cleanup() {
     rm -f "$TMPBIN"
 }
-trap cleanup EXIT HUP INT TERM
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if ! cp "$BIN" "$TMPBIN" || ! chmod 700 "$TMPBIN"; then
     echo "NES Emulator: cannot stage executable in $TMPDIR."
