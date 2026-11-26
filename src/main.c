@@ -31,6 +31,8 @@ static int game_x, game_y, game_w, game_h;
 static char root_dir[MAX_PATH_LEN] = BROWSE_ROOT_DEFAULT;
 static char current_dir[MAX_PATH_LEN] = BROWSE_ROOT_DEFAULT;
 static struct xnes_ctx_t *nes;
+static GtkWidget *main_window;
+static int picker_requested;
 static int in_game, paused;
 static volatile sig_atomic_t quitting;
 
@@ -416,6 +418,89 @@ static void sleep_ns(uint64_t ns) {
     nanosleep(&ts, NULL);
 }
 
+static void on_open_game_clicked(GtkButton *button, gpointer user_data) {
+    (void)button;
+    (void)user_data;
+    picker_requested = 1;
+    if (gtk_main_level() > 0) gtk_main_quit();
+}
+
+static void on_quit_clicked(GtkButton *button, gpointer user_data) {
+    (void)button;
+    (void)user_data;
+    quitting = 1;
+    if (gtk_main_level() > 0) gtk_main_quit();
+}
+
+static gboolean on_main_window_delete(GtkWidget *widget, GdkEvent *event, gpointer user_data) {
+    (void)widget;
+    (void)event;
+    (void)user_data;
+    quitting = 1;
+    if (gtk_main_level() > 0) gtk_main_quit();
+    return TRUE;
+}
+
+static void on_fullscreen_toggled(GtkToggleButton *button, gpointer user_data) {
+    GtkWindow *window = GTK_WINDOW(user_data);
+    if (gtk_toggle_button_get_active(button)) gtk_window_fullscreen(window);
+    else gtk_window_unfullscreen(window);
+}
+
+static void on_options_clicked(GtkButton *button, gpointer user_data) {
+    GtkWidget *dialog;
+    (void)button;
+    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_MODAL,
+                                    GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
+                                    "NES audio is disabled. Gameplay is rendered through FBInk with e-ink refresh batching.");
+    gtk_window_set_title(GTK_WINDOW(dialog), "NES Options");
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+static GtkWidget *create_main_window(void) {
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *vbox = gtk_vbox_new(FALSE, 8);
+    GtkWidget *toolbar = gtk_hbutton_box_new();
+    GtkWidget *open_button = gtk_button_new_with_label("Open Game");
+    GtkWidget *options_button = gtk_button_new_with_label("Options");
+    GtkWidget *fullscreen_button = gtk_toggle_button_new_with_label("Fullscreen");
+    GtkWidget *quit_button = gtk_button_new_with_label("Quit");
+    GtkWidget *spacer = gtk_label_new("");
+    GtkWidget *welcome = gtk_label_new("NES Emulator\\n\\nTap Open Game to choose a .nes ROM.");
+    gtk_window_set_title(GTK_WINDOW(window), "L:A_N:application_ID:nes_PC:N");
+    gtk_window_set_default_size(GTK_WINDOW(window), 600, 760);
+    gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
+    gtk_container_set_border_width(GTK_CONTAINER(vbox), 10);
+    gtk_button_box_set_layout(GTK_BUTTON_BOX(toolbar), GTK_BUTTONBOX_CENTER);
+    gtk_box_set_spacing(GTK_BOX(toolbar), 6);
+    gtk_box_pack_start(GTK_BOX(toolbar), open_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(toolbar), options_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(toolbar), fullscreen_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(toolbar), quit_button, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), toolbar, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(vbox), spacer, FALSE, FALSE, 8);
+    gtk_label_set_justify(GTK_LABEL(welcome), GTK_JUSTIFY_CENTER);
+    gtk_misc_set_alignment(GTK_MISC(welcome), 0.5f, 0.5f);
+    gtk_box_pack_start(GTK_BOX(vbox), welcome, TRUE, TRUE, 0);
+    gtk_container_add(GTK_CONTAINER(window), vbox);
+    g_signal_connect(open_button, "clicked", G_CALLBACK(on_open_game_clicked), NULL);
+    g_signal_connect(options_button, "clicked", G_CALLBACK(on_options_clicked), window);
+    g_signal_connect(fullscreen_button, "toggled", G_CALLBACK(on_fullscreen_toggled), window);
+    g_signal_connect(quit_button, "clicked", G_CALLBACK(on_quit_clicked), NULL);
+    g_signal_connect(window, "delete-event", G_CALLBACK(on_main_window_delete), NULL);
+    return window;
+}
+
+static gboolean poll_quit_signal(gpointer user_data) {
+    (void)user_data;
+    if (quitting) {
+        if (gtk_main_level() > 0) gtk_main_quit();
+        return FALSE;
+    }
+    return TRUE;
+}
+
 int main(int argc, char **argv) {
     int i;
     uint64_t frame_ns;
@@ -477,16 +562,25 @@ int main(int argc, char **argv) {
     game_buf = (uint8_t *)malloc((size_t)game_w * game_h);
     if (!game_buf) { free(screen_buf); fbink_close(fbfd); return 2; }
 
+    main_window = create_main_window();
+    g_timeout_add(100, poll_quit_signal, NULL);
     while (!quitting) {
         if (!in_game) {
             char *rom_path;
             GtkWidget *dialog;
-            if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
-            rom_path = nes_file_picker_run(root_dir, current_dir, sizeof(current_dir));
-            if (!rom_path) { quitting = 1; break; }
+            picker_requested = 0;
+            gtk_widget_show_all(main_window);
+            gtk_main();
+            if (quitting) break;
+            if (!picker_requested) continue;
+
+            rom_path = nes_file_picker_run(GTK_WINDOW(main_window), root_dir,
+                                           current_dir, sizeof(current_dir));
+            if (!rom_path) continue;
             if (load_rom_path(rom_path) != 0) {
-                dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
-                                                GTK_BUTTONS_OK, "Unable to load this NES ROM.");
+                dialog = gtk_message_dialog_new(GTK_WINDOW(main_window), GTK_DIALOG_MODAL,
+                                                GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                                                "Unable to load this NES ROM.");
                 gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
@@ -498,36 +592,39 @@ int main(int argc, char **argv) {
                 if (nes) xnes_ctx_free(nes);
                 nes = NULL;
                 in_game = 0;
-                dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
-                                                GTK_BUTTONS_OK,
+                dialog = gtk_message_dialog_new(GTK_WINDOW(main_window), GTK_DIALOG_MODAL,
+                                                GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                                                 "Touch input was not found. The game cannot start.");
                 gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
                 continue;
             }
+            gtk_widget_hide(main_window);
             touch.was_active = 0;
             draw_game_ui();
             render_game();
-            continue;
         }
 
-        poll_touch();
-        if (in_game && nes && !paused) {
-            for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
-                frame_ns = xnes_step_frame(nes);
-                poll_touch();
-                sleep_ns(frame_ns);
+        while (in_game && !quitting) {
+            poll_touch();
+            if (in_game && nes && !paused) {
+                for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
+                    frame_ns = xnes_step_frame(nes);
+                    poll_touch();
+                    sleep_ns(frame_ns);
+                }
+                if (in_game && nes) render_game();
+            } else {
+                usleep(20000);
             }
-            if (in_game && nes) render_game();
-        } else {
-            usleep(20000);
         }
     }
 
     release_controller();
     if (nes) xnes_ctx_free(nes);
     if (touch.fd >= 0) close(touch.fd);
+    if (main_window) gtk_widget_destroy(main_window);
     fbink_cls(fbfd, &fb_cfg, NULL, false);
     fbink_close(fbfd);
     free(game_buf);
