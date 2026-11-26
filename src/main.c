@@ -506,19 +506,24 @@ static void process_touch_point(int x, int y) {
     if (!in_game) return;
 
     if (menu_open) {
+        int panel_h = screen_h * 48 / 100;
+        int button_h = panel_h / 6;
         int rel_y = y - screen_h * 26 / 100;
+        int resume_y = panel_h / 4;
+        int library_y = panel_h / 2 - 8;
+        int quit_y = (panel_h * 3) / 4 - 8;
         if (x < screen_w * 10 / 100 || x > screen_w * 90 / 100) return;
-        if (rel_y >= screen_h * 5 / 100 && rel_y < screen_h * 17 / 100) {
+        if (rel_y >= resume_y && rel_y < resume_y + button_h) {
             menu_open = 0;
             paused = 0;
             draw_game_ui();
             render_game();
-            fprintf(stderr, "NES: in-game menu action=resume\n");
-        } else if (rel_y >= screen_h * 21 / 100 && rel_y < screen_h * 34 / 100) {
-            fprintf(stderr, "NES: in-game menu action=back-to-library\n");
+            fprintf(stderr, "NES: in-game menu action=resume\\n");
+        } else if (rel_y >= library_y && rel_y < library_y + button_h) {
+            fprintf(stderr, "NES: in-game menu action=back-to-library\\n");
             exit_game();
-        } else if (rel_y >= screen_h * 37 / 100 && rel_y < screen_h * 48 / 100) {
-            fprintf(stderr, "NES: in-game menu action=quit-emulator\n");
+        } else if (rel_y >= quit_y && rel_y < quit_y + button_h) {
+            fprintf(stderr, "NES: in-game menu action=quit-emulator\\n");
             quitting = 1;
             exit_game();
         }
