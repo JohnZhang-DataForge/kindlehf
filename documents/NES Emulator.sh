@@ -8,7 +8,7 @@
 APPDIR="/mnt/us/nes"
 BIN="$APPDIR/bin/nes"
 ROMDIR="$APPDIR/roms"
-TMPDIR="\${TMPDIR:-/var/tmp}"
+TMPDIR="${TMPDIR:-/var/tmp}"
 TMPBIN="$TMPDIR/kindle-nes-$$"
 LOG="$APPDIR/nes.log"
 
