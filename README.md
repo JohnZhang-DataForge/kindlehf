@@ -3,15 +3,16 @@
 Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.16.3 or newer. First target: Kindle Basic 10th Generation (2019), firmware 5.16.8.
 
 - NES core: pinned xboot/libxnes (CPU, PPU, cartridge/mapper emulation)
-- Display: FBInk raw framebuffer output
+- Display: FBInk raw framebuffer output for gameplay; Kindle GTK2/X11 window for the ROM picker
 - Input: Linux evdev touchscreen
-- UI: native framebuffer file picker; browse folders under `/mnt/us` and tap any `.nes` file; no ROM staging folder required
+- UI: native GTK2 file picker modeled on Gambatte-K2 `SimpleFilePicker` (Cancel + path, scrollable list, `..`, folders first, touch-drag scrolling); lists `.nes` files only
 - Audio: disabled
 - E-ink: 7 emulated frames per display update; monochrome Bayer conversion and A2 game updates. Not 60 Hz display output.
 
 ## Repository layout
 
-- `src/main.c`: native frontend
+- `src/main.c`: libxnes/FBInk NES gameplay frontend
+- `src/file_picker.c`: GTK2 ROM picker ported to C without the Gambatte Game Boy core or libgee
 - `build.sh`: reproducible KindleHF build
 - `.github/workflows/kindlehf.yml`: public GitHub-hosted runner build and packaging
 - `tests/`: generated mapper-0 test ROM and host core/controller tests
@@ -27,11 +28,11 @@ The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolch
 
 For a local Linux build: `bash ./build.sh`.
 
-Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08. The compiler flags follow KOX's KHF target: `-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb`. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
+Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08, plus KindleModding Kindle SDK (pinned commit) to link against firmware GTK2/GLib libraries. The compiler flags follow KOX's KHF target: `-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb`. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
 
 ## ROM file picker
 
-The native touchscreen browser starts at `/mnt/us`, lists folders and `.nes` files, sorts folders first, and supports parent-folder navigation and paging. It does not follow symbolic links, so browsing remains inside the Kindle USB storage tree. ROMs can remain in any folder under `/mnt/us`; there is no requirement to copy them into `nes/roms/`.
+The picker starts at `/mnt/us` and follows the Gambatte-K2 dialog layout: Cancel button and current path at the top, a scrollable single-column list, a `..` parent row, directories first, then `.nes` files, and touch-drag scrolling that does not activate the row. ROMs can remain in any folder under `/mnt/us`; no `nes/roms/` staging folder is required. The GTK2 runtime is supplied by Kindle firmware and is dynamically linked, not bundled.
 
 ## Current limitations
 
