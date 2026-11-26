@@ -48,7 +48,7 @@ int nes_rom_prepare_for_libxnes(const uint8_t *source, size_t source_size,
     if (source_size > MAX_ROM_SIZE)
         return fail(error, error_size, "ROM exceeds the 64 MB safety limit.");
     if (source[0] != 'N' || source[1] != 'E' || source[2] != 'S' || source[3] != 0x1a)
-        return fail(error, error_size, "File does not have the NES\\x1A signature.");
+        return fail(error, error_size, "File does not have the NES\x1A signature.");
 
     format = (source[7] >> 2) & 0x03;
     if (format == 1 || format == 3)
