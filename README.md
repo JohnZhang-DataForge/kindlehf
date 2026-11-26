@@ -27,7 +27,7 @@ The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolch
 
 For a local Linux build: `bash ./build.sh`.
 
-Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
+Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08. The compiler flags follow KOX's KHF target: `-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb`. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
 
 ## Current limitations
 
