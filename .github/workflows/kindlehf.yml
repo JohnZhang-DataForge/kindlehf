@@ -42,6 +42,10 @@ jobs:
             -Ivendor/libxnes/src tests/test_core.c "${XNES_SOURCES[@]}" \
             -lm -o build/host/test_core
           build/host/test_core build/host/homebrew-mapper0.nes
+          gcc -std=gnu11 -O2 -Wall -Wextra -Isrc -Ivendor/libxnes/src \\
+            src/rom_compat.c tests/test_rom_compat.c "${XNES_SOURCES[@]}" \\
+            -lm -o build/host/test_rom_compat
+          build/host/test_rom_compat
           sh -n "documents/NES Emulator.sh"
 
       - name: Cross-compile and verify KindleHF executable
@@ -88,7 +92,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.4 — prerelease
+          ## Kindle NES v0.1.5 — prerelease
 
           Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker with responsive in-game event loop for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
@@ -115,10 +119,15 @@ jobs:
           - Gameplay now runs in short GLib timer callbacks inside the GTK main loop instead of a blocking emulation loop. This keeps GTK/X11 event dispatch alive after ROM selection and lets the Exit/Pause touch handling remain responsive.
           - Runtime logs include ROM selection, detected evdev touchscreen, and game-loop startup at `/mnt/us/nes/nes.log`.
 
+          ### ROM compatibility
+          - Normalize basic NES 2.0 headers with 8-bit linear PRG/CHR bank counts into the legacy iNES format expected by the bundled libxnes parser.
+          - Synthesize writable 8 KB CHR memory for CHR-RAM cartridges because this libxnes MMC1 implementation routes CHR reads/writes through its CHR buffer.
+          - Host CI verifies a synthetic NES 2.0 mapper-1 (MMC1), CHR-RAM cartridge through normalization, core initialization, CHR read/write, and a frame step.
+          - NES 2.0 extended mapper IDs, submappers, and extended/exponent ROM sizes remain unsupported.
+
           ### ROM loading diagnostics
-          - Log the selected path, file size, iNES header, mapper, validation result, and core initialization result to `/mnt/us/nes/nes.log`.
-          - Display a plain-text GTK error dialog instead of a stock-icon message dialog, avoiding missing Kindle theme icon failures.
-          - Report unsupported NES 2.0, CHR-RAM-only, truncated, and unsupported-mapper ROMs explicitly rather than presenting a generic load error.
+          - Log the selected path, file size, source header, normalized mapper and size, and core initialization result to `/mnt/us/nes/nes.log`.
+          - Display a plain-text GTK error dialog without applying container-only GTK properties to its label.
 
           ### Current limitations
           - Audio is disabled.
