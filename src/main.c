@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
-#include <dirent.h>
+#include <gtk/gtk.h>
+#include "file_picker.h"
 #include <ctype.h>
 #include <fcntl.h>
 #include <linux/input.h>
@@ -17,11 +18,6 @@
 #include <xnes.h>
 
 #define BROWSE_ROOT_DEFAULT "/mnt/us"
-#define MAX_ENTRIES 512
-#define PAGE_ROWS_MAX 10
-#define MENU_ROW_TOP 132
-#define MENU_ROW_HEIGHT 50
-#define MENU_FOOTER_HEIGHT 80
 #define MAX_PATH_LEN 1024
 #define INPUT_SCAN_LIMIT 32
 #define DISPLAY_BATCH_FRAMES 7
@@ -32,12 +28,8 @@ static FBInkState fb_state;
 static int screen_w, screen_h;
 static uint8_t *screen_buf, *game_buf;
 static int game_x, game_y, game_w, game_h;
-typedef struct { char name[256]; int is_dir; } PickerEntry;
 static char root_dir[MAX_PATH_LEN] = BROWSE_ROOT_DEFAULT;
 static char current_dir[MAX_PATH_LEN] = BROWSE_ROOT_DEFAULT;
-static PickerEntry picker_entries[MAX_ENTRIES];
-static int picker_count, page_offset, page_rows;
-static char menu_message[96];
 static struct xnes_ctx_t *nes;
 static int in_game, paused;
 static volatile sig_atomic_t quitting;
@@ -149,41 +141,11 @@ static int show_raw(uint8_t *buf, int w, int h, int x, int y, WFM_MODE_INDEX_T w
                                 (short)x, (short)y, &cfg);
 }
 
-static int has_nes_suffix(const char *s) {
-    size_t n = strlen(s);
-    return n >= 4 && strcasecmp(s + n - 4, ".nes") == 0;
-}
 static int path_within_root(const char *path, const char *root) {
     size_t n = strlen(root);
     return strncmp(path, root, n) == 0 && (path[n] == '\0' || path[n] == '/');
 }
-static int compare_entries(const void *a, const void *b) {
-    const PickerEntry *ea = (const PickerEntry *)a, *eb = (const PickerEntry *)b;
-    if (ea->is_dir != eb->is_dir) return eb->is_dir - ea->is_dir;
-    return strcasecmp(ea->name, eb->name);
-}
-static void scan_directory(void) {
-    DIR *d = opendir(current_dir);
-    struct dirent *e;
-    picker_count = 0;
-    if (!d) { snprintf(menu_message, sizeof(menu_message), "CANNOT READ THIS FOLDER"); return; }
-    while ((e = readdir(d)) != NULL && picker_count < MAX_ENTRIES) {
-        struct stat st;
-        char path[MAX_PATH_LEN];
-        int is_dir;
-        if (e->d_name[0] == '.') continue;
-        if (snprintf(path, sizeof(path), "%s/%s", current_dir, e->d_name) >= (int)sizeof(path)) continue;
-        /* Do not follow symlinks: keep browsing confined to the Kindle USB tree. */
-        if (lstat(path, &st) != 0) continue;
-        is_dir = S_ISDIR(st.st_mode);
-        if (!is_dir && (!S_ISREG(st.st_mode) || !has_nes_suffix(e->d_name))) continue;
-        snprintf(picker_entries[picker_count].name, sizeof(picker_entries[picker_count].name), "%s", e->d_name);
-        picker_entries[picker_count].is_dir = is_dir;
-        picker_count++;
-    }
-    closedir(d);
-    qsort(picker_entries, (size_t)picker_count, sizeof(picker_entries[0]), compare_entries);
-}
+
 static int validate_ines_rom(const uint8_t *data, size_t len) {
     size_t required, trainer;
     if (!data || len < 16) return 0;
@@ -213,68 +175,9 @@ static int load_rom_path(const char *path) {
     free(data);
     if (!nes) return -1;
     xnes_set_speed(nes, 1.0f);
-    in_game = 1; paused = 0; menu_message[0] = '\0';
+    in_game = 1; paused = 0;
     return 0;
 }
-static int navigate_to(const char *path) {
-    char resolved[MAX_PATH_LEN];
-    struct stat st;
-    if (!realpath(path, resolved) || !path_within_root(resolved, root_dir)) return -1;
-    if (stat(resolved, &st) != 0 || !S_ISDIR(st.st_mode)) return -1;
-    if (snprintf(current_dir, sizeof(current_dir), "%s", resolved) >= (int)sizeof(current_dir)) return -1;
-    page_offset = 0; menu_message[0] = '\0'; scan_directory();
-    return 0;
-}
-static void navigate_parent(void) {
-    char *slash;
-    if (strcmp(current_dir, root_dir) == 0) return;
-    slash = strrchr(current_dir, '/');
-    if (!slash || slash < current_dir + strlen(root_dir)) snprintf(current_dir, sizeof(current_dir), "%s", root_dir);
-    else if (slash == current_dir) snprintf(current_dir, sizeof(current_dir), "%s", root_dir);
-    else *slash = '\0';
-    page_offset = 0; menu_message[0] = '\0'; scan_directory();
-}
-
-static void draw_menu(void) {
-    int i, rows, y;
-    char path_line[MAX_PATH_LEN];
-    page_rows = (screen_h - MENU_ROW_TOP - MENU_FOOTER_HEIGHT) / MENU_ROW_HEIGHT;
-    if (page_rows < 1) page_rows = 1;
-    if (page_rows > PAGE_ROWS_MAX) page_rows = PAGE_ROWS_MAX;
-    memset(screen_buf, 255, (size_t)screen_w * screen_h);
-    fill_rect(screen_buf, screen_w, screen_h, 0, 0, screen_w, 115, 0);
-    rect(screen_buf, screen_w, screen_h, 18, 18, 92, 40, 255);
-    draw_text(screen_buf, screen_w, screen_h, 35, 32, "ROOT", 1, 255);
-    center_text(screen_buf, screen_w, screen_h, 24, "OPEN NES FILE", 2, 255);
-    rect(screen_buf, screen_w, screen_h, screen_w - 110, 18, 92, 40, 255);
-    draw_text(screen_buf, screen_w, screen_h, screen_w - 88, 32, "UP", 1, 255);
-    snprintf(path_line, sizeof(path_line), "%s", current_dir);
-    draw_text(screen_buf, screen_w, screen_h, 20, 72, path_line, 1, 255);
-    if (menu_message[0]) draw_text(screen_buf, screen_w, screen_h, 20, 96, menu_message, 1, 255);
-    else draw_text(screen_buf, screen_w, screen_h, 20, 96, "TAP A FOLDER OR NES FILE", 1, 255);
-    rows = picker_count - page_offset;
-    if (rows > page_rows) rows = page_rows;
-    if (rows < 0) rows = 0;
-    if (picker_count == 0) center_text(screen_buf, screen_w, screen_h, MENU_ROW_TOP + 35, "NO NES FILES OR FOLDERS", 2, 0);
-    for (i = 0; i < rows; i++) {
-        char label[256];
-        y = MENU_ROW_TOP + i * MENU_ROW_HEIGHT;
-        rect(screen_buf, screen_w, screen_h, 18, y, screen_w - 36, MENU_ROW_HEIGHT - 5, 0);
-        if (picker_entries[page_offset + i].is_dir) snprintf(label, sizeof(label), "[DIR] %s", picker_entries[page_offset + i].name);
-        else snprintf(label, sizeof(label), "%s", picker_entries[page_offset + i].name);
-        draw_text(screen_buf, screen_w, screen_h, 32, y + 13, label, 2, 0);
-    }
-    if (page_offset > 0) {
-        rect(screen_buf, screen_w, screen_h, 24, screen_h - 66, 180, 48, 0);
-        draw_text(screen_buf, screen_w, screen_h, 66, screen_h - 50, "PREV", 2, 0);
-    }
-    if (page_offset + page_rows < picker_count) {
-        rect(screen_buf, screen_w, screen_h, screen_w - 204, screen_h - 66, 180, 48, 0);
-        draw_text(screen_buf, screen_w, screen_h, screen_w - 162, screen_h - 50, "NEXT", 2, 0);
-    }
-    show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
-}
-
 static void draw_game_ui(void) {
     int cx, cy, r;
     memset(screen_buf, 255, (size_t)screen_w * screen_h);
@@ -435,42 +338,22 @@ static int scale_axis(int v, int minv, int maxv, int outmax) {
 static void exit_game(void) {
     release_controller();
     if (nes) xnes_ctx_free(nes);
-    nes = NULL; in_game = 0; paused = 0;
-    page_offset = 0; menu_message[0] = '\0';
-    scan_directory(); draw_menu();
+    nes = NULL;
+    in_game = 0;
+    paused = 0;
+    if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
+    touch.was_active = 0;
 }
 
 static void process_touch_point(int x, int y) {
-    if (!in_game) {
-        if (y < 115) {
-            if (x < screen_w * 22 / 100) { navigate_to(root_dir); draw_menu(); }
-            else if (x > screen_w * 78 / 100) { navigate_parent(); draw_menu(); }
-        } else if (y >= MENU_ROW_TOP && y < MENU_ROW_TOP + page_rows * MENU_ROW_HEIGHT) {
-            int idx = page_offset + (y - MENU_ROW_TOP) / MENU_ROW_HEIGHT;
-            if (idx >= 0 && idx < picker_count) {
-                char path[MAX_PATH_LEN];
-                if (snprintf(path, sizeof(path), "%s/%s", current_dir, picker_entries[idx].name) >= (int)sizeof(path)) {
-                    snprintf(menu_message, sizeof(menu_message), "PATH TOO LONG"); draw_menu();
-                } else if (picker_entries[idx].is_dir) {
-                    if (navigate_to(path) != 0) snprintf(menu_message, sizeof(menu_message), "CANNOT OPEN FOLDER");
-                    draw_menu();
-                } else if (load_rom_path(path) == 0) {
-                    draw_game_ui(); render_game();
-                } else {
-                    snprintf(menu_message, sizeof(menu_message), "UNSUPPORTED OR INVALID NES FILE"); draw_menu();
-                }
-            }
-        } else if (y > screen_h - 85) {
-            if (x < screen_w/2 && page_offset > 0) {
-                page_offset -= page_rows; if (page_offset < 0) page_offset = 0; draw_menu();
-            } else if (x >= screen_w/2 && page_offset + page_rows < picker_count) {
-                page_offset += page_rows; draw_menu();
-            }
-        }
-    } else if (y < screen_h * 7 / 100) {
+    if (!in_game) return;
+    if (y < screen_h * 7 / 100) {
         if (x < screen_w * 22 / 100) exit_game();
         else if (x > screen_w * 70 / 100) {
-            paused = !paused; release_controller(); draw_game_ui(); render_game();
+            paused = !paused;
+            release_controller();
+            draw_game_ui();
+            render_game();
         }
     }
 }
@@ -538,30 +421,44 @@ int main(int argc, char **argv) {
     uint64_t frame_ns;
     const char *start_dir = (argc > 1) ? argv[1] : BROWSE_ROOT_DEFAULT;
     char resolved_start[MAX_PATH_LEN];
-    if (!realpath(BROWSE_ROOT_DEFAULT, root_dir) || !realpath(start_dir, resolved_start) ||
+
+    if (!gtk_init_check(&argc, &argv)) {
+        fprintf(stderr, "GTK2 initialization failed; check DISPLAY and Kindle X11 environment\\n");
+        return 4;
+    }
+    if (!realpath(BROWSE_ROOT_DEFAULT, root_dir) ||
+        !realpath(start_dir, resolved_start) ||
         !path_within_root(resolved_start, root_dir)) {
-        fprintf(stderr, "Cannot initialize file browser under %s\\n", BROWSE_ROOT_DEFAULT);
+        fprintf(stderr, "Cannot initialize ROM picker under %s\\n", BROWSE_ROOT_DEFAULT);
         return 2;
     }
     if (snprintf(current_dir, sizeof(current_dir), "%s", resolved_start) >= (int)sizeof(current_dir)) return 2;
-    mkdir("/mnt/us/nes", 0755); mkdir("/mnt/us/nes/saves", 0755);
-    signal(SIGINT, on_signal); signal(SIGTERM, on_signal);
+    mkdir("/mnt/us/nes", 0755);
+    mkdir("/mnt/us/nes/saves", 0755);
+    signal(SIGINT, on_signal);
+    signal(SIGTERM, on_signal);
 
     memset(&fb_cfg, 0, sizeof(fb_cfg));
-    fb_cfg.is_quiet = true; fb_cfg.ignore_alpha = true; fb_cfg.wfm_mode = WFM_GC16;
+    fb_cfg.is_quiet = true;
+    fb_cfg.ignore_alpha = true;
+    fb_cfg.wfm_mode = WFM_GC16;
     fbfd = fbink_open();
     if (fbfd < 0 || fbink_init(fbfd, &fb_cfg) < 0) {
-        fprintf(stderr, "FBInk initialization failed\n"); return 2;
+        fprintf(stderr, "FBInk initialization failed\\n");
+        return 2;
     }
     memset(&fb_state, 0, sizeof(fb_state));
     fbink_get_state(&fb_cfg, &fb_state);
-    screen_w = (int)fb_state.view_width; screen_h = (int)fb_state.view_height;
+    screen_w = (int)fb_state.view_width;
+    screen_h = (int)fb_state.view_height;
     if (screen_w < 200 || screen_h < 300) {
-        screen_w = (int)fb_state.screen_width; screen_h = (int)fb_state.screen_height;
+        screen_w = (int)fb_state.screen_width;
+        screen_h = (int)fb_state.screen_height;
     }
     if (screen_w < 200 || screen_h < 300) {
-        fprintf(stderr, "Could not determine framebuffer dimensions\n");
-        fbink_close(fbfd); return 2;
+        fprintf(stderr, "Could not determine framebuffer dimensions\\n");
+        fbink_close(fbfd);
+        return 2;
     }
 
     screen_buf = (uint8_t *)malloc((size_t)screen_w * screen_h);
@@ -569,24 +466,52 @@ int main(int argc, char **argv) {
     game_w = screen_w - 40;
     game_h = game_w * 240 / 256;
     if (game_h > screen_h - 260) { game_h = screen_h - 260; game_w = game_h * 256 / 240; }
-    game_x = (screen_w - game_w) / 2; game_y = 56;
+    game_x = (screen_w - game_w) / 2;
+    game_y = 56;
     if (game_y + game_h > screen_h - 220) {
-        game_y = 30; game_h = screen_h - 260; game_w = game_h * 256 / 240;
+        game_y = 30;
+        game_h = screen_h - 260;
+        game_w = game_h * 256 / 240;
         game_x = (screen_w - game_w) / 2;
     }
     game_buf = (uint8_t *)malloc((size_t)game_w * game_h);
     if (!game_buf) { free(screen_buf); fbink_close(fbfd); return 2; }
 
-    if (open_touch_device() < 0) {
-        memset(screen_buf, 255, (size_t)screen_w * screen_h);
-        center_text(screen_buf, screen_w, screen_h, screen_h/2 - 20, "TOUCH INPUT NOT FOUND", 2, 0);
-        show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
-        fprintf(stderr, "No touchscreen input device found under /dev/input/event*\n");
-        free(game_buf); free(screen_buf); fbink_close(fbfd); return 3;
-    }
-
-    scan_directory(); draw_menu();
     while (!quitting) {
+        if (!in_game) {
+            char *rom_path;
+            GtkWidget *dialog;
+            if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
+            rom_path = nes_file_picker_run(root_dir, current_dir, sizeof(current_dir));
+            if (!rom_path) { quitting = 1; break; }
+            if (load_rom_path(rom_path) != 0) {
+                dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
+                                                GTK_BUTTONS_OK, "Unable to load this NES ROM.");
+                gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
+                gtk_dialog_run(GTK_DIALOG(dialog));
+                gtk_widget_destroy(dialog);
+                free(rom_path);
+                continue;
+            }
+            free(rom_path);
+            if (open_touch_device() < 0) {
+                if (nes) xnes_ctx_free(nes);
+                nes = NULL;
+                in_game = 0;
+                dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR,
+                                                GTK_BUTTONS_OK,
+                                                "Touch input was not found. The game cannot start.");
+                gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
+                gtk_dialog_run(GTK_DIALOG(dialog));
+                gtk_widget_destroy(dialog);
+                continue;
+            }
+            touch.was_active = 0;
+            draw_game_ui();
+            render_game();
+            continue;
+        }
+
         poll_touch();
         if (in_game && nes && !paused) {
             for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
@@ -595,7 +520,9 @@ int main(int argc, char **argv) {
                 sleep_ns(frame_ns);
             }
             if (in_game && nes) render_game();
-        } else usleep(20000);
+        } else {
+            usleep(20000);
+        }
     }
 
     release_controller();
@@ -603,6 +530,7 @@ int main(int argc, char **argv) {
     if (touch.fd >= 0) close(touch.fd);
     fbink_cls(fbfd, &fb_cfg, NULL, false);
     fbink_close(fbfd);
-    free(game_buf); free(screen_buf);
+    free(game_buf);
+    free(screen_buf);
     return 0;
 }
