@@ -42,7 +42,8 @@ static char current_dir[MAX_PATH_LEN] = BROWSE_ROOT_DEFAULT;
 static struct xnes_ctx_t *nes;
 static GtkWidget *main_window;
 static int picker_requested;
-static int in_game, paused;
+static int in_game, paused, menu_open;
+static unsigned touch_debug_events, touch_debug_reports;
 static volatile sig_atomic_t quitting;
 static uint64_t next_game_update_ns;
 
@@ -256,6 +257,7 @@ static int load_rom_path(const char *path, char *error, size_t error_size) {
     xnes_set_speed(nes, 1.0f);
     in_game = 1;
     paused = 0;
+    menu_open = 0;
     fprintf(stderr, "NES: ROM core initialized successfully (mapper=%u)\n", mapper);
     fflush(stderr);
     return 0;
@@ -281,9 +283,10 @@ static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
 static void draw_game_ui(void) {
     int cx, cy, r;
     memset(screen_buf, 255, (size_t)screen_w * screen_h);
-    fill_rect(screen_buf, screen_w, screen_h, 0, 0, screen_w, 48, 0);
-    draw_text(screen_buf, screen_w, screen_h, 20, 16, "EXIT", 2, 255);
-    draw_text(screen_buf, screen_w, screen_h, screen_w - 132, 16, paused ? "RESUME" : "PAUSE", 2, 255);
+    fill_rect(screen_buf, screen_w, screen_h, 0, 0, screen_w, 56, 0);
+    draw_text(screen_buf, screen_w, screen_h, 18, 18, "BACK", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, screen_w/2 - 24, 18, "MENU", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, screen_w - 132, 18, paused ? "RESUME" : "PAUSE", 2, 255);
 
     cx = screen_w * 23 / 100; cy = screen_h * 85 / 100; r = screen_w * 13 / 100;
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
@@ -291,6 +294,10 @@ static void draw_game_ui(void) {
     fill_rect(screen_buf, screen_w, screen_h, cx - r, cy - r/5, 2*r, 2*r/5, 0);
     fill_rect(screen_buf, screen_w, screen_h, cx - r/5, cy - r, 2*r/5, 2*r, 0);
     draw_text(screen_buf, screen_w, screen_h, cx - 13, cy - 7, "D", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, cx - r/2, cy - r - 18, "U", 2, 0);
+    draw_text(screen_buf, screen_w, screen_h, cx - r/2, cy + r + 5, "D", 2, 0);
+    draw_text(screen_buf, screen_w, screen_h, cx - r - 18, cy - 7, "L", 2, 0);
+    draw_text(screen_buf, screen_w, screen_h, cx + r + 5, cy - 7, "R", 2, 0);
 
     cx = screen_w * 76 / 100; cy = screen_h * 84 / 100; r = screen_w * 7 / 100;
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
@@ -303,8 +310,29 @@ static void draw_game_ui(void) {
     draw_text(screen_buf, screen_w, screen_h, screen_w*45/100, screen_h*78/100 + 10, "SEL", 1, 0);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 0);
     draw_text(screen_buf, screen_w, screen_h, screen_w*44/100, screen_h*84/100 + 10, "START", 1, 0);
-
     show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
+}
+
+static void draw_game_menu(void) {
+    int pw = screen_w * 80 / 100, ph = screen_h * 48 / 100;
+    int px = (screen_w - pw) / 2, py = (screen_h - ph) / 2;
+    int bw = pw - 48, bh = ph / 6;
+    uint8_t *panel = (uint8_t *)malloc((size_t)pw * ph);
+    if (!panel) return;
+    memset(panel, 255, (size_t)pw * ph);
+    rect(panel, pw, ph, 0, 0, pw, ph, 0);
+    center_text(panel, pw, ph, 24, "GAME OPTIONS", 2, 0);
+    fill_rect(panel, pw, ph, 24, ph/4, bw, bh, 230);
+    rect(panel, pw, ph, 24, ph/4, bw, bh, 0);
+    center_text(panel, pw, ph, ph/4 + bh/2 - 7, "RESUME", 2, 0);
+    fill_rect(panel, pw, ph, 24, ph/2 - 8, bw, bh, 230);
+    rect(panel, pw, ph, 24, ph/2 - 8, bw, bh, 0);
+    center_text(panel, pw, ph, ph/2 + bh/2 - 15, "BACK TO LIBRARY", 2, 0);
+    fill_rect(panel, pw, ph, 24, (ph*3)/4 - 8, bw, bh, 230);
+    rect(panel, pw, ph, 24, (ph*3)/4 - 8, bw, bh, 0);
+    center_text(panel, pw, ph, (ph*3)/4 + bh/2 - 15, "QUIT EMULATOR", 2, 0);
+    show_raw(panel, pw, ph, px, py, WFM_GC16);
+    free(panel);
 }
 
 static void render_game(void) {
@@ -335,13 +363,14 @@ static void render_game(void) {
     }
     rendered_frames++;
     show_raw(game_buf, game_w, game_h, game_x, game_y, WFM_A2);
-    if (paused) {
+    if (paused && !menu_open) {
         uint8_t overlay[250 * 84];
         memset(overlay, 255, sizeof(overlay));
         rect(overlay, 250, 84, 0, 0, 250, 84, 0);
         center_text(overlay, 250, 84, 34, "PAUSED", 3, 0);
         show_raw(overlay, 250, 84, screen_w/2 - 125, screen_h/2 - 42, WFM_GC16);
     }
+    if (menu_open) draw_game_menu();
 }
 
 static void release_controller(void) {
@@ -390,6 +419,7 @@ static int open_touch_device(void) {
     for (i = 0; i < INPUT_SCAN_LIMIT; i++) {
         char path[64];
         int fd, xcode = -1, ycode = -1, track = -1, slot = -1;
+        char device_name[256] = "unknown";
         unsigned long evbits[(EV_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
         unsigned long absbits[(ABS_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
         unsigned long keybits[(KEY_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
@@ -411,7 +441,8 @@ static int open_touch_device(void) {
             xcode = ABS_X; ycode = ABS_Y;
         } else { close(fd); continue; }
         ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits);
-        if (!bit_is_set(keybits, BTN_TOUCH) && track < 0) { close(fd); continue; }
+        if (!bit_is_set(keybits, BTN_TOUCH) &&
+            !bit_is_set(keybits, BTN_TOOL_FINGER) && track < 0) { close(fd); continue; }
         if (ioctl(fd, EVIOCGABS(xcode), &ax) < 0 || ioctl(fd, EVIOCGABS(ycode), &ay) < 0) {
             close(fd); continue;
         }
@@ -435,9 +466,13 @@ static int open_touch_device(void) {
         touch.swap_axes = fb_state.touch_swap_axes;
         touch.mirror_x = fb_state.touch_mirror_x;
         touch.mirror_y = fb_state.touch_mirror_y;
-        fprintf(stderr, "NES: touchscreen=%s x=%d..%d y=%d..%d multitouch=%d slots=%d\n",
-                path, touch.x_min, touch.x_max, touch.y_min, touch.y_max,
-                touch.is_multitouch, touch.slot_count);
+        (void)ioctl(fd, EVIOCGNAME(sizeof(device_name)), device_name);
+        fprintf(stderr, "NES: touchscreen=%s name=%s xcode=%d x=%d..%d ycode=%d y=%d..%d tracking=%d slot=%d multitouch=%d slots=%d swap=%d mirror=%d/%d btn_touch=%d btn_finger=%d\n",
+                path, device_name, touch.x_code, touch.x_min, touch.x_max,
+                touch.y_code, touch.y_min, touch.y_max, touch.tracking_code,
+                touch.slot_code, touch.is_multitouch, touch.slot_count,
+                touch.swap_axes, touch.mirror_x, touch.mirror_y,
+                bit_is_set(keybits, BTN_TOUCH), bit_is_set(keybits, BTN_TOOL_FINGER));
         fflush(stderr);
         return 0;
     }
@@ -459,6 +494,7 @@ static void exit_game(void) {
     nes = NULL;
     in_game = 0;
     paused = 0;
+    menu_open = 0;
     if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
     touch.was_active = 0;
     fprintf(stderr, "NES: game stopped; returning to launcher window\n");
@@ -468,11 +504,46 @@ static void exit_game(void) {
 
 static void process_touch_point(int x, int y) {
     if (!in_game) return;
-    if (y < screen_h * 7 / 100) {
-        if (x < screen_w * 22 / 100) exit_game();
-        else if (x > screen_w * 70 / 100) {
+
+    if (menu_open) {
+        int rel_y = y - screen_h * 26 / 100;
+        if (x < screen_w * 10 / 100 || x > screen_w * 90 / 100) return;
+        if (rel_y >= screen_h * 5 / 100 && rel_y < screen_h * 17 / 100) {
+            menu_open = 0;
+            paused = 0;
+            draw_game_ui();
+            render_game();
+            fprintf(stderr, "NES: in-game menu action=resume\n");
+        } else if (rel_y >= screen_h * 21 / 100 && rel_y < screen_h * 34 / 100) {
+            fprintf(stderr, "NES: in-game menu action=back-to-library\n");
+            exit_game();
+        } else if (rel_y >= screen_h * 37 / 100 && rel_y < screen_h * 48 / 100) {
+            fprintf(stderr, "NES: in-game menu action=quit-emulator\n");
+            quitting = 1;
+            exit_game();
+        }
+        fflush(stderr);
+        return;
+    }
+
+    if (y < screen_h * 8 / 100) {
+        if (x < screen_w * 30 / 100) {
+            fprintf(stderr, "NES: touchscreen action=back-to-library x=%d y=%d\n", x, y);
+            fflush(stderr);
+            exit_game();
+        } else if (x >= screen_w * 35 / 100 && x <= screen_w * 65 / 100) {
+            fprintf(stderr, "NES: touchscreen action=open-options x=%d y=%d\n", x, y);
+            menu_open = 1;
+            paused = 1;
+            release_controller();
+            draw_game_menu();
+            fflush(stderr);
+        } else if (x > screen_w * 70 / 100) {
             paused = !paused;
             release_controller();
+            fprintf(stderr, "NES: touchscreen action=%s x=%d y=%d\n",
+                    paused ? "pause" : "resume", x, y);
+            fflush(stderr);
             draw_game_ui();
             render_game();
         }
@@ -484,6 +555,21 @@ static void poll_touch(void) {
     ssize_t n;
     if (touch.fd < 0) return;
     while ((n = read(touch.fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+        if (touch_debug_events < 64) {
+            fprintf(stderr, "NES: touch raw type=%u code=%u value=%d\n",
+                    ev.type, ev.code, ev.value);
+            fflush(stderr);
+            touch_debug_events++;
+        }
+        if (ev.type == EV_SYN && ev.code == SYN_DROPPED) {
+            int i;
+            for (i = 0; i < MAX_TOUCH_POINTS; i++) touch.points[i].active = 0;
+            touch.was_active = 0;
+            release_controller();
+            fprintf(stderr, "NES: touchscreen SYN_DROPPED; controller state reset\n");
+            fflush(stderr);
+            continue;
+        }
         if (ev.type == EV_ABS) {
             if (touch.slot_code >= 0 && ev.code == touch.slot_code) {
                 int slot = ev.value - touch.slot_min;
@@ -496,8 +582,10 @@ static void poll_touch(void) {
                 if (touch.tracking_code >= 0 && ev.code == touch.tracking_code)
                     point->active = ev.value >= 0;
             }
-        } else if (ev.type == EV_KEY && ev.code == BTN_TOUCH &&
-                   (!touch.is_multitouch || touch.tracking_code < 0)) {
+        } else if (ev.type == EV_KEY &&
+                   (ev.code == BTN_TOUCH || ev.code == BTN_TOOL_FINGER) &&
+                   (!touch.is_multitouch || touch.tracking_code < 0 ||
+                    ev.code == BTN_TOUCH)) {
             touch.points[0].active = ev.value != 0;
         } else if (ev.type == EV_SYN && ev.code == SYN_REPORT) {
             int any_active = 0, first_x = 0, first_y = 0;
@@ -519,9 +607,20 @@ static void poll_touch(void) {
                 if (touch.mirror_y) y = screen_h - 1 - y;
                 if (!any_active) { first_x = x; first_y = y; }
                 any_active = 1;
-                if (in_game) combined_mask |= game_mask_at(x, y);
+                if (in_game && !menu_open) combined_mask |= game_mask_at(x, y);
             }
-            if (any_active && !touch.was_active) process_touch_point(first_x, first_y);
+            if (touch_debug_reports < 32) {
+                fprintf(stderr, "NES: touch report active=%d x=%d y=%d mask=0x%02x previous=%d in_game=%d menu=%d\n",
+                        any_active, first_x, first_y, combined_mask,
+                        touch.was_active, in_game, menu_open);
+                fflush(stderr);
+                touch_debug_reports++;
+            }
+            if (any_active && !touch.was_active) {
+                fprintf(stderr, "NES: touch down mapped=%d,%d\n", first_x, first_y);
+                fflush(stderr);
+                process_touch_point(first_x, first_y);
+            }
             if (in_game) set_controller_mask(combined_mask);
             else if (!any_active && touch.was_active) set_controller_mask(0);
             touch.was_active = any_active;
@@ -614,12 +713,12 @@ static void on_fullscreen_toggled(GtkToggleButton *button, gpointer user_data) {
 static void on_options_clicked(GtkButton *button, gpointer user_data) {
     GtkWidget *dialog;
     (void)button;
-    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_MODAL,
+    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_DESTROY_WITH_PARENT,
                                     GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
-                                    "NES audio is disabled. Gameplay is rendered through FBInk with e-ink refresh batching.");
+                                    "Audio is disabled. Touch controls are shown on the game screen. Use MENU for Resume, Back to Library, or Quit Emulator.");
     gtk_window_set_title(GTK_WINDOW(dialog), "NES Options");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
+    g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
+    gtk_widget_show(dialog);
 }
 
 static GtkWidget *create_main_window(void) {
