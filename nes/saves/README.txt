@@ -1,0 +1,1 @@
+Reserved for future battery-backed cartridge save data. The initial frontend does not yet persist SRAM or save states.\n
