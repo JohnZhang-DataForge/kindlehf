@@ -45,3 +45,8 @@ The GTK2 main window presents Open Game, Options, Fullscreen, and Quit. Open Gam
 - A successful cross-build does not prove the app runs correctly on a physical Kindle.
 
 See `README-INSTALL.txt` in the installation ZIP for installation and recovery steps.
+
+
+## ROM loading troubleshooting
+
+The emulator writes the selected ROM path, file size, iNES header, mapper, validation result, and cartridge-core initialization result to `/mnt/us/nes/nes.log`. Unsupported NES 2.0 headers, CHR-RAM-only images, truncated files, and unsupported mappers are reported explicitly. Error dialogs use plain text rather than stock theme icons because Kindle GTK themes may not provide those icons.
