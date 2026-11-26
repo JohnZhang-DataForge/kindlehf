@@ -35,6 +35,7 @@ static GtkWidget *main_window;
 static int picker_requested;
 static int in_game, paused;
 static volatile sig_atomic_t quitting;
+static uint64_t next_game_update_ns;
 
 #define MAX_TOUCH_POINTS 10
 struct TouchPoint {
@@ -325,8 +326,14 @@ static int open_touch_device(void) {
         touch.swap_axes = fb_state.touch_swap_axes;
         touch.mirror_x = fb_state.touch_mirror_x;
         touch.mirror_y = fb_state.touch_mirror_y;
+        fprintf(stderr, "NES: touchscreen=%s x=%d..%d y=%d..%d multitouch=%d slots=%d\\n",
+                path, touch.x_min, touch.x_max, touch.y_min, touch.y_max,
+                touch.is_multitouch, touch.slot_count);
+        fflush(stderr);
         return 0;
     }
+    fprintf(stderr, "NES: no compatible evdev touchscreen found\\n");
+    fflush(stderr);
     return -1;
 }
 
@@ -345,6 +352,9 @@ static void exit_game(void) {
     paused = 0;
     if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
     touch.was_active = 0;
+    fprintf(stderr, "NES: game stopped; returning to launcher window\\n");
+    fflush(stderr);
+    if (gtk_main_level() > 0) gtk_main_quit();
 }
 
 static void process_touch_point(int x, int y) {
@@ -410,12 +420,57 @@ static void poll_touch(void) {
     }
 }
 
-static void sleep_ns(uint64_t ns) {
+static uint64_t monotonic_ns(void) {
     struct timespec ts;
-    if (ns > 50000000ULL) ns = 50000000ULL;
-    ts.tv_sec = (time_t)(ns / 1000000000ULL);
-    ts.tv_nsec = (long)(ns % 1000000000ULL);
-    nanosleep(&ts, NULL);
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0) return 0;
+    return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
+}
+
+/*
+ * Keep GTK's main loop alive while the NES core runs. The old implementation
+ * ran a blocking while-loop plus nanosleep after the picker returned; that
+ * starved GTK/X11 and made the device appear frozen after selecting a ROM.
+ * Run a bounded e-ink batch from a GLib timer instead.
+ */
+static gboolean game_tick(gpointer user_data) {
+    int i;
+    uint64_t batch_start, batch_ns = 0, now;
+    (void)user_data;
+
+    if (quitting || !in_game || !nes) return FALSE;
+
+    poll_touch();
+    if (quitting || !in_game || !nes) {
+        if (gtk_main_level() > 0) gtk_main_quit();
+        return FALSE;
+    }
+    if (paused) return TRUE;
+
+    now = monotonic_ns();
+    if (next_game_update_ns && now < next_game_update_ns) return TRUE;
+    batch_start = now;
+
+    for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
+        uint64_t frame_ns = xnes_step_frame(nes);
+        if (frame_ns == 0 || frame_ns > 50000000ULL) {
+            fprintf(stderr, "NES: suspicious frame duration=%llu ns\\n",
+                    (unsigned long long)frame_ns);
+            fflush(stderr);
+            if (frame_ns == 0) frame_ns = 16666667ULL;
+            if (frame_ns > 50000000ULL) frame_ns = 50000000ULL;
+        }
+        batch_ns += frame_ns;
+        poll_touch();
+    }
+
+    if (in_game && nes && !paused && !quitting) render_game();
+
+    now = monotonic_ns();
+    if (batch_ns == 0) batch_ns = 116666667ULL;
+    next_game_update_ns = batch_start + batch_ns;
+    /* Never accumulate an unbounded catch-up backlog on a slow e-ink device. */
+    if (next_game_update_ns < now) next_game_update_ns = now;
+    return in_game && !quitting;
 }
 
 static void on_open_game_clicked(GtkButton *button, gpointer user_data) {
@@ -502,11 +557,11 @@ static gboolean poll_quit_signal(gpointer user_data) {
 }
 
 int main(int argc, char **argv) {
-    int i;
-    uint64_t frame_ns;
     const char *start_dir = (argc > 1) ? argv[1] : BROWSE_ROOT_DEFAULT;
     char resolved_start[MAX_PATH_LEN];
 
+    fprintf(stderr, "NES: starting native GTK2 frontend\\n");
+    fflush(stderr);
     if (!gtk_init_check(&argc, &argv)) {
         fprintf(stderr, "GTK2 initialization failed; check DISPLAY and Kindle X11 environment\\n");
         return 4;
@@ -587,6 +642,8 @@ int main(int argc, char **argv) {
                 free(rom_path);
                 continue;
             }
+            fprintf(stderr, "NES: selected ROM=%s\\n", rom_path);
+            fflush(stderr);
             free(rom_path);
             if (open_touch_device() < 0) {
                 if (nes) xnes_ctx_free(nes);
@@ -602,22 +659,13 @@ int main(int argc, char **argv) {
             }
             gtk_widget_hide(main_window);
             touch.was_active = 0;
+            next_game_update_ns = monotonic_ns();
             draw_game_ui();
             render_game();
-        }
-
-        while (in_game && !quitting) {
-            poll_touch();
-            if (in_game && nes && !paused) {
-                for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
-                    frame_ns = xnes_step_frame(nes);
-                    poll_touch();
-                    sleep_ns(frame_ns);
-                }
-                if (in_game && nes) render_game();
-            } else {
-                usleep(20000);
-            }
+            fprintf(stderr, "NES: game started; entering GTK-integrated emulation loop\\n");
+            fflush(stderr);
+            g_timeout_add(2, game_tick, NULL);
+            gtk_main();
         }
     }
 
