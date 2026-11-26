@@ -2,6 +2,7 @@
 #include <gtk/gtk.h>
 #include "file_picker.h"
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
 #include <signal.h>
@@ -149,37 +150,113 @@ static int path_within_root(const char *path, const char *root) {
     return strncmp(path, root, n) == 0 && (path[n] == '\0' || path[n] == '/');
 }
 
-static int validate_ines_rom(const uint8_t *data, size_t len) {
+static const char *validate_ines_rom(const uint8_t *data, size_t len) {
     size_t required, trainer;
-    if (!data || len < 16) return 0;
-    if (data[0] != 'N' || data[1] != 'E' || data[2] != 'S' || data[3] != 0x1a) return 0;
-    /* libxnes legacy iNES path expects CHR-ROM bytes; reject NES 2.0 and CHR-RAM-only files. */
-    if ((data[7] & 0x0c) != 0 || data[4] == 0 || data[5] == 0) return 0;
+    if (!data || len < 16) return "file is shorter than the 16-byte iNES header";
+    if (data[0] != 'N' || data[1] != 'E' || data[2] != 'S' || data[3] != 0x1a)
+        return "file does not have the NES\x1A signature";
+    if ((data[7] & 0x0c) == 0x08)
+        return "NES 2.0 format is not supported by the bundled libxnes core yet";
+    if ((data[7] & 0x0c) != 0)
+        return "header uses an unsupported/reserved format marker";
+    if (data[4] == 0) return "ROM contains no PRG-ROM banks";
+    if (data[5] == 0)
+        return "ROM uses CHR-RAM only; this build currently requires CHR-ROM";
     trainer = (data[6] & 0x04) ? 512u : 0u;
     required = 16u + trainer + (size_t)data[4] * 16384u + (size_t)data[5] * 8192u;
-    return len >= required;
+    if (len < required)
+        return "ROM data is truncated (file is smaller than its iNES header declares)";
+    return NULL;
 }
 
-static int load_rom_path(const char *path) {
+static int load_rom_path(const char *path, char *error, size_t error_size) {
     FILE *f;
-    long len;
+    long len = -1;
     uint8_t *data;
+    const char *validation_error;
+
+    if (error && error_size) error[0] = '\0';
+    fprintf(stderr, "NES: opening ROM: %s\n", path ? path : "(null)");
+    fflush(stderr);
     f = fopen(path, "rb");
-    if (!f) return -1;
+    if (!f) {
+        if (error && error_size) snprintf(error, error_size, "Cannot open ROM: %s", strerror(errno));
+        fprintf(stderr, "NES: ROM open failed: %s\n", strerror(errno));
+        return -1;
+    }
     if (fseek(f, 0, SEEK_END) != 0 || (len = ftell(f)) < 16 ||
-        len > 64L*1024L*1024L || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return -1; }
+        len > 64L*1024L*1024L || fseek(f, 0, SEEK_SET) != 0) {
+        if (error && error_size) snprintf(error, error_size, "ROM file size is invalid or exceeds 64 MB.");
+        fprintf(stderr, "NES: ROM size/seek check failed (length=%ld)\n", len);
+        fclose(f);
+        return -1;
+    }
+    fprintf(stderr, "NES: ROM size=%ld bytes\n", len);
     data = (uint8_t *)malloc((size_t)len);
-    if (!data) { fclose(f); return -1; }
-    if (fread(data, 1, (size_t)len, f) != (size_t)len) { free(data); fclose(f); return -1; }
+    if (!data) {
+        if (error && error_size) snprintf(error, error_size, "Not enough memory to read this ROM.");
+        fprintf(stderr, "NES: ROM allocation failed\n");
+        fclose(f);
+        return -1;
+    }
+    if (fread(data, 1, (size_t)len, f) != (size_t)len) {
+        if (error && error_size) snprintf(error, error_size, "Could not read the complete ROM file.");
+        fprintf(stderr, "NES: ROM read failed\n");
+        free(data);
+        fclose(f);
+        return -1;
+    }
     fclose(f);
-    if (!validate_ines_rom(data, (size_t)len)) { free(data); return -1; }
-    if (nes) xnes_ctx_free(nes);
+
+    validation_error = validate_ines_rom(data, (size_t)len);
+    if (validation_error) {
+        if (error && error_size) snprintf(error, error_size, "%s", validation_error);
+        fprintf(stderr, "NES: ROM rejected: %s (header=%02x %02x %02x %02x %02x %02x %02x %02x)\n",
+                validation_error, data[0], data[1], data[2], data[3],
+                data[4], data[5], data[6], data[7]);
+        free(data);
+        return -1;
+    }
+
+    fprintf(stderr, "NES: iNES mapper=%u PRG=%u x16KB CHR=%u x8KB trainer=%s\n",
+            (unsigned)(((data[6] >> 4) & 0x0f) | (data[7] & 0xf0)),
+            data[4], data[5], (data[6] & 0x04) ? "yes" : "no");
+    if (nes) {
+        xnes_ctx_free(nes);
+        nes = NULL;
+    }
     nes = xnes_ctx_alloc(data, (size_t)len);
     free(data);
-    if (!nes) return -1;
+    if (!nes) {
+        if (error && error_size)
+            snprintf(error, error_size, "The ROM format is valid, but its mapper is unsupported by this emulator.");
+        fprintf(stderr, "NES: libxnes rejected ROM (unsupported mapper or cartridge initialization failure)\n");
+        return -1;
+    }
     xnes_set_speed(nes, 1.0f);
-    in_game = 1; paused = 0;
+    in_game = 1;
+    paused = 0;
+    fprintf(stderr, "NES: ROM core initialized successfully\n");
+    fflush(stderr);
     return 0;
+}
+
+static void show_plain_error_dialog(GtkWindow *parent, const char *message) {
+    GtkWidget *dialog;
+    GtkWidget *label;
+    GtkWidget *area;
+
+    dialog = gtk_dialog_new_with_buttons("NES Emulator", parent, GTK_DIALOG_MODAL,
+                                         "OK", GTK_RESPONSE_OK, NULL);
+    area = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    label = gtk_label_new(message ? message : "Unknown error");
+    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_misc_set_alignment(GTK_MISC(label), 0.0f, 0.5f);
+    gtk_container_set_border_width(GTK_CONTAINER(label), 18);
+    gtk_box_pack_start(GTK_BOX(area), label, TRUE, TRUE, 8);
+    gtk_widget_show_all(dialog);
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
 }
 static void draw_game_ui(void) {
     int cx, cy, r;
@@ -326,13 +403,13 @@ static int open_touch_device(void) {
         touch.swap_axes = fb_state.touch_swap_axes;
         touch.mirror_x = fb_state.touch_mirror_x;
         touch.mirror_y = fb_state.touch_mirror_y;
-        fprintf(stderr, "NES: touchscreen=%s x=%d..%d y=%d..%d multitouch=%d slots=%d\\n",
+        fprintf(stderr, "NES: touchscreen=%s x=%d..%d y=%d..%d multitouch=%d slots=%d\n",
                 path, touch.x_min, touch.x_max, touch.y_min, touch.y_max,
                 touch.is_multitouch, touch.slot_count);
         fflush(stderr);
         return 0;
     }
-    fprintf(stderr, "NES: no compatible evdev touchscreen found\\n");
+    fprintf(stderr, "NES: no compatible evdev touchscreen found\n");
     fflush(stderr);
     return -1;
 }
@@ -352,7 +429,7 @@ static void exit_game(void) {
     paused = 0;
     if (touch.fd >= 0) { close(touch.fd); touch.fd = -1; }
     touch.was_active = 0;
-    fprintf(stderr, "NES: game stopped; returning to launcher window\\n");
+    fprintf(stderr, "NES: game stopped; returning to launcher window\n");
     fflush(stderr);
     if (gtk_main_level() > 0) gtk_main_quit();
 }
@@ -453,7 +530,7 @@ static gboolean game_tick(gpointer user_data) {
     for (i = 0; i < DISPLAY_BATCH_FRAMES && in_game && !paused && !quitting; i++) {
         uint64_t frame_ns = xnes_step_frame(nes);
         if (frame_ns == 0 || frame_ns > 50000000ULL) {
-            fprintf(stderr, "NES: suspicious frame duration=%llu ns\\n",
+            fprintf(stderr, "NES: suspicious frame duration=%llu ns\n",
                     (unsigned long long)frame_ns);
             fflush(stderr);
             if (frame_ns == 0) frame_ns = 16666667ULL;
@@ -522,7 +599,7 @@ static GtkWidget *create_main_window(void) {
     GtkWidget *fullscreen_button = gtk_toggle_button_new_with_label("Fullscreen");
     GtkWidget *quit_button = gtk_button_new_with_label("Quit");
     GtkWidget *spacer = gtk_label_new("");
-    GtkWidget *welcome = gtk_label_new("NES Emulator\\n\\nTap Open Game to choose a .nes ROM.");
+    GtkWidget *welcome = gtk_label_new("NES Emulator\n\nTap Open Game to choose a .nes ROM.");
     gtk_window_set_title(GTK_WINDOW(window), "L:A_N:application_ID:nes_PC:N");
     gtk_window_set_default_size(GTK_WINDOW(window), 600, 760);
     gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER);
@@ -560,16 +637,16 @@ int main(int argc, char **argv) {
     const char *start_dir = (argc > 1) ? argv[1] : BROWSE_ROOT_DEFAULT;
     char resolved_start[MAX_PATH_LEN];
 
-    fprintf(stderr, "NES: starting native GTK2 frontend\\n");
+    fprintf(stderr, "NES: starting native GTK2 frontend\n");
     fflush(stderr);
     if (!gtk_init_check(&argc, &argv)) {
-        fprintf(stderr, "GTK2 initialization failed; check DISPLAY and Kindle X11 environment\\n");
+        fprintf(stderr, "GTK2 initialization failed; check DISPLAY and Kindle X11 environment\n");
         return 4;
     }
     if (!realpath(BROWSE_ROOT_DEFAULT, root_dir) ||
         !realpath(start_dir, resolved_start) ||
         !path_within_root(resolved_start, root_dir)) {
-        fprintf(stderr, "Cannot initialize ROM picker under %s\\n", BROWSE_ROOT_DEFAULT);
+        fprintf(stderr, "Cannot initialize ROM picker under %s\n", BROWSE_ROOT_DEFAULT);
         return 2;
     }
     if (snprintf(current_dir, sizeof(current_dir), "%s", resolved_start) >= (int)sizeof(current_dir)) return 2;
@@ -584,7 +661,7 @@ int main(int argc, char **argv) {
     fb_cfg.wfm_mode = WFM_GC16;
     fbfd = fbink_open();
     if (fbfd < 0 || fbink_init(fbfd, &fb_cfg) < 0) {
-        fprintf(stderr, "FBInk initialization failed\\n");
+        fprintf(stderr, "FBInk initialization failed\n");
         return 2;
     }
     memset(&fb_state, 0, sizeof(fb_state));
@@ -596,7 +673,7 @@ int main(int argc, char **argv) {
         screen_h = (int)fb_state.screen_height;
     }
     if (screen_w < 200 || screen_h < 300) {
-        fprintf(stderr, "Could not determine framebuffer dimensions\\n");
+        fprintf(stderr, "Could not determine framebuffer dimensions\n");
         fbink_close(fbfd);
         return 2;
     }
@@ -618,11 +695,13 @@ int main(int argc, char **argv) {
     if (!game_buf) { free(screen_buf); fbink_close(fbfd); return 2; }
 
     main_window = create_main_window();
+    fprintf(stderr, "NES: main window ready; waiting for Open Game\n");
+    fflush(stderr);
     g_timeout_add(100, poll_quit_signal, NULL);
     while (!quitting) {
         if (!in_game) {
             char *rom_path;
-            GtkWidget *dialog;
+            char rom_error[256];
             picker_requested = 0;
             gtk_widget_show_all(main_window);
             gtk_main();
@@ -631,30 +710,33 @@ int main(int argc, char **argv) {
 
             rom_path = nes_file_picker_run(GTK_WINDOW(main_window), root_dir,
                                            current_dir, sizeof(current_dir));
-            if (!rom_path) continue;
-            if (load_rom_path(rom_path) != 0) {
-                dialog = gtk_message_dialog_new(GTK_WINDOW(main_window), GTK_DIALOG_MODAL,
-                                                GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                                                "Unable to load this NES ROM.");
-                gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
-                gtk_dialog_run(GTK_DIALOG(dialog));
-                gtk_widget_destroy(dialog);
+            if (!rom_path) {
+                fprintf(stderr, "NES: ROM picker closed without a selection\n");
+                fflush(stderr);
+                continue;
+            }
+            fprintf(stderr, "NES: picker selected ROM=%s\n", rom_path);
+            fflush(stderr);
+            if (load_rom_path(rom_path, rom_error, sizeof(rom_error)) != 0) {
+                fprintf(stderr, "NES: cannot start selected ROM: %s\n",
+                        rom_error[0] ? rom_error : "unknown error");
+                fflush(stderr);
+                show_plain_error_dialog(GTK_WINDOW(main_window),
+                                        rom_error[0] ? rom_error : "Unable to load this NES ROM.");
                 free(rom_path);
                 continue;
             }
-            fprintf(stderr, "NES: selected ROM=%s\\n", rom_path);
+            fprintf(stderr, "NES: selected ROM=%s\n", rom_path);
             fflush(stderr);
             free(rom_path);
             if (open_touch_device() < 0) {
                 if (nes) xnes_ctx_free(nes);
                 nes = NULL;
                 in_game = 0;
-                dialog = gtk_message_dialog_new(GTK_WINDOW(main_window), GTK_DIALOG_MODAL,
-                                                GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                                                "Touch input was not found. The game cannot start.");
-                gtk_window_set_title(GTK_WINDOW(dialog), "NES Emulator");
-                gtk_dialog_run(GTK_DIALOG(dialog));
-                gtk_widget_destroy(dialog);
+                fprintf(stderr, "NES: touchscreen discovery failed; game launch cancelled\n");
+                fflush(stderr);
+                show_plain_error_dialog(GTK_WINDOW(main_window),
+                                        "Touch input was not found. The game cannot start.");
                 continue;
             }
             gtk_widget_hide(main_window);
@@ -662,7 +744,7 @@ int main(int argc, char **argv) {
             next_game_update_ns = monotonic_ns();
             draw_game_ui();
             render_game();
-            fprintf(stderr, "NES: game started; entering GTK-integrated emulation loop\\n");
+            fprintf(stderr, "NES: game started; entering GTK-integrated emulation loop\n");
             fflush(stderr);
             g_timeout_add(2, game_tick, NULL);
             gtk_main();
