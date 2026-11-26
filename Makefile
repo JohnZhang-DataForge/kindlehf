@@ -1,0 +1,1 @@
+CROSS ?= arm-kindlehf-linux-gnueabihf\n.PHONY: build clean\nbuild:\n\t./build.sh\nclean:\n\trm -rf build dist vendor\n
