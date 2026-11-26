@@ -100,7 +100,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.10 — prerelease
+          ## Kindle NES v0.1.11 — prerelease
 
           Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker with responsive in-game event loop for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
@@ -112,7 +112,7 @@ jobs:
           - ELF reports — architecture, ABI attributes, program headers, and dynamic dependency inspection.
 
           ### Validation
-          - GitHub-hosted Ubuntu 24.04 runner completed the mapper-0 ROM/core/controller tests and the NES 2.0 MMC1/CHR-RAM compatibility test (normalization, core initialization, CHR read/write, and frame step).
+          - GitHub-hosted Ubuntu 24.04 runner completed mapper-0 core/controller tests, NES 2.0 MMC1/CHR-RAM normalization tests, and a new Mapper 227 regression test covering BMC 1200-in-1 PRG banking modes, mirroring, CHR-RAM access, and cleanup.
           - KindleHF cross-compilation and ELF checks completed successfully.
           - The compatibility test uses an original synthetic MMC1 test cartridge, not the user's commercial Zelda ROM. The new build still requires confirmation on the physical Kindle with that exact ROM.
           - The Kindle firmware FBInk build is MINIMAL and has image blitting disabled. The frontend now copies 8-bpp grayscale pixels directly into the mmap'ed framebuffer and uses FBInk only for the e-ink refresh ioctl; host CI tests stride, offsets, clipping, inversion, and bounds.
@@ -126,7 +126,7 @@ jobs:
           - GTK2/GLib/GDK libraries are dynamically linked from Kindle firmware and are not bundled.
 
           ### Touchscreen controls and exit/menu behavior
-          - Fixed first-launch controller invisibility on Kindle e-ink: after a GC16 refresh is submitted, the frontend now calls FBInk's fbink_wait_for_complete with marker 0 (the latest update) before allowing the next update. This fences the initial full-screen controller/game refresh against the first A2 partial game frame, preventing the EPDC from merging or superseding them.
+          - The v0.1.10 GC16 completion fence alone did not resolve the reported first-launch controller invisibility. v0.1.11 now schedules the first display from a GLib idle callback after entering the GTK main loop, advances seven NES frames before sampling the PPU front buffer, composes the controls and game into one framebuffer, and waits for GC16 completion before starting the A2 timer.
           - Fixed the custom 5x7 bitmap font row order. The previous bit shift rendered every game-overlay label vertically inverted; BACK, MENU, PAUSE/RESUME, D-pad directions, A/B, SELECT/START, and game-menu labels now use the correct orientation.
           - ROM launch now composes the game image and controller overlay into one framebuffer and submits one full-screen GC16 refresh. This avoids issuing a full-screen UI refresh immediately followed by a separate partial game refresh, which could leave the controller area stale until another touch event.
           - The game overlay now has large BACK, MENU, and PAUSE/RESUME touch targets in the top bar, plus a visible D-pad, A/B, SELECT, and START pad.
@@ -146,13 +146,14 @@ jobs:
 
           ### ROM compatibility
           - Normalize basic NES 2.0 headers with 8-bit linear PRG/CHR bank counts into the legacy iNES format expected by the bundled libxnes parser.
+          - Add the standard BMC 1200-in-1 Mapper 227 address-latch board to the pinned libxnes build through a reproducible local patch. The supported board implements 16K/32K PRG modes, fixed high-bank mode, mirroring, and unbanked 8K CHR-RAM; separate battery-WRAM variants are not claimed.
           - Synthesize writable 8 KB CHR memory for CHR-RAM cartridges because this libxnes MMC1 implementation routes CHR reads/writes through its CHR buffer.
           - Host CI verifies a synthetic NES 2.0 mapper-1 (MMC1), CHR-RAM cartridge through normalization, core initialization, CHR read/write, and a frame step.
           - NES 2.0 extended mapper IDs, submappers, and extended/exponent ROM sizes remain unsupported.
 
           ### ROM loading diagnostics
           - Log the selected path, file size, source header, normalized mapper and size, and core initialization result to `/mnt/us/nes/nes.log`.
-          - Display a plain-text GTK error dialog without applying container-only GTK properties to its label.
+          - ROM load errors use a non-modal GTK dialog so unsupported cartridges return to the picker without entering a nested modal event loop.
           - Avoid FBInk's disabled `fbink_print_raw_data` image path; use direct framebuffer mmap writes followed by `fbink_refresh`.
 
           ### Current limitations
@@ -171,12 +172,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.10 >/dev/null 2>&1; then
-            gh release upload v0.1.10 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.11 >/dev/null 2>&1; then
+            gh release upload v0.1.11 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.10 "${ASSETS[@]}" \
+            gh release create v0.1.11 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.10" \
+              --title "Kindle NES v0.1.11" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
