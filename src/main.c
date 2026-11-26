@@ -36,12 +36,17 @@ static struct xnes_ctx_t *nes;
 static int in_game, paused;
 static volatile sig_atomic_t quitting;
 
+#define MAX_TOUCH_POINTS 10
+struct TouchPoint {
+    int raw_x, raw_y, have_x, have_y, active;
+};
 struct Touch {
     int fd, x_code, y_code, x_min, x_max, y_min, y_max;
-    int raw_x, raw_y, have_x, have_y, active, was_active, tracking_code;
-    int swap_axes, mirror_x, mirror_y;
+    int tracking_code, slot_code, slot_min, slot_count, current_slot;
+    int is_multitouch, was_active, swap_axes, mirror_x, mirror_y;
+    struct TouchPoint points[MAX_TOUCH_POINTS];
 };
-static struct Touch touch = { .fd = -1, .tracking_code = -1 };
+static struct Touch touch = { .fd = -1, .tracking_code = -1, .slot_code = -1 };
 
 static const uint8_t font5x7[36][5] = {
     {0x7e,0x11,0x11,0x11,0x7e}, {0x7f,0x49,0x49,0x49,0x36},
@@ -337,11 +342,11 @@ static int open_touch_device(void) {
     int i;
     for (i = 0; i < INPUT_SCAN_LIMIT; i++) {
         char path[64];
-        int fd, xcode = -1, ycode = -1, track = -1;
+        int fd, xcode = -1, ycode = -1, track = -1, slot = -1;
         unsigned long evbits[(EV_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
         unsigned long absbits[(ABS_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
         unsigned long keybits[(KEY_MAX + 8*sizeof(unsigned long))/(8*sizeof(unsigned long))];
-        struct input_absinfo ax, ay;
+        struct input_absinfo ax, ay, aslot;
         snprintf(path, sizeof(path), "/dev/input/event%d", i);
         fd = open(path, O_RDONLY | O_NONBLOCK);
         if (fd < 0) continue;
@@ -351,18 +356,33 @@ static int open_touch_device(void) {
             ioctl(fd, EVIOCGBIT(EV_ABS, sizeof(absbits)), absbits) < 0) {
             close(fd); continue;
         }
-        if (bit_is_set(absbits, ABS_X) && bit_is_set(absbits, ABS_Y)) {
-            xcode = ABS_X; ycode = ABS_Y;
-        } else if (bit_is_set(absbits, ABS_MT_POSITION_X) && bit_is_set(absbits, ABS_MT_POSITION_Y)) {
+        if (bit_is_set(absbits, ABS_MT_POSITION_X) && bit_is_set(absbits, ABS_MT_POSITION_Y)) {
             xcode = ABS_MT_POSITION_X; ycode = ABS_MT_POSITION_Y;
             if (bit_is_set(absbits, ABS_MT_TRACKING_ID)) track = ABS_MT_TRACKING_ID;
+            if (bit_is_set(absbits, ABS_MT_SLOT)) slot = ABS_MT_SLOT;
+        } else if (bit_is_set(absbits, ABS_X) && bit_is_set(absbits, ABS_Y)) {
+            xcode = ABS_X; ycode = ABS_Y;
         } else { close(fd); continue; }
         ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits);
         if (!bit_is_set(keybits, BTN_TOUCH) && track < 0) { close(fd); continue; }
         if (ioctl(fd, EVIOCGABS(xcode), &ax) < 0 || ioctl(fd, EVIOCGABS(ycode), &ay) < 0) {
             close(fd); continue;
         }
-        touch.fd = fd; touch.x_code = xcode; touch.y_code = ycode; touch.tracking_code = track;
+        memset(&touch, 0, sizeof(touch));
+        touch.fd = fd; touch.x_code = xcode; touch.y_code = ycode;
+        touch.tracking_code = track; touch.slot_code = slot;
+        touch.is_multitouch = (xcode == ABS_MT_POSITION_X);
+        touch.slot_count = 1;
+        if (slot >= 0 && ioctl(fd, EVIOCGABS(slot), &aslot) == 0) {
+            touch.slot_min = aslot.minimum;
+            touch.slot_count = aslot.maximum - aslot.minimum + 1;
+            if (touch.slot_count < 1) touch.slot_count = 1;
+            if (touch.slot_count > MAX_TOUCH_POINTS) touch.slot_count = MAX_TOUCH_POINTS;
+        } else {
+            touch.slot_code = -1;
+            touch.slot_min = 0;
+        }
+        touch.current_slot = 0;
         touch.x_min = ax.minimum; touch.x_max = ax.maximum;
         touch.y_min = ay.minimum; touch.y_max = ay.maximum;
         touch.swap_axes = fb_state.touch_swap_axes;
@@ -422,16 +442,31 @@ static void poll_touch(void) {
     if (touch.fd < 0) return;
     while ((n = read(touch.fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
         if (ev.type == EV_ABS) {
-            if (ev.code == touch.x_code) { touch.raw_x = ev.value; touch.have_x = 1; }
-            if (ev.code == touch.y_code) { touch.raw_y = ev.value; touch.have_y = 1; }
-            if (touch.tracking_code >= 0 && ev.code == touch.tracking_code) touch.active = ev.value >= 0;
-        } else if (ev.type == EV_KEY && ev.code == BTN_TOUCH) {
-            touch.active = ev.value != 0;
+            if (touch.slot_code >= 0 && ev.code == touch.slot_code) {
+                int slot = ev.value - touch.slot_min;
+                if (slot >= 0 && slot < touch.slot_count) touch.current_slot = slot;
+            } else {
+                int slot = touch.is_multitouch ? touch.current_slot : 0;
+                struct TouchPoint *point = &touch.points[slot];
+                if (ev.code == touch.x_code) { point->raw_x = ev.value; point->have_x = 1; }
+                if (ev.code == touch.y_code) { point->raw_y = ev.value; point->have_y = 1; }
+                if (touch.tracking_code >= 0 && ev.code == touch.tracking_code)
+                    point->active = ev.value >= 0;
+            }
+        } else if (ev.type == EV_KEY && ev.code == BTN_TOUCH &&
+                   (!touch.is_multitouch || touch.tracking_code < 0)) {
+            touch.points[0].active = ev.value != 0;
         } else if (ev.type == EV_SYN && ev.code == SYN_REPORT) {
-            if (touch.active && touch.have_x && touch.have_y) {
-                int rx = touch.raw_x, ry = touch.raw_y;
-                int xmin = touch.x_min, xmax = touch.x_max, ymin = touch.y_min, ymax = touch.y_max;
-                int x, y;
+            int any_active = 0, first_x = 0, first_y = 0;
+            uint8_t combined_mask = 0;
+            int slot;
+            for (slot = 0; slot < touch.slot_count; slot++) {
+                struct TouchPoint *point = &touch.points[slot];
+                int rx, ry, xmin, xmax, ymin, ymax, x, y;
+                if (!point->active || !point->have_x || !point->have_y) continue;
+                rx = point->raw_x; ry = point->raw_y;
+                xmin = touch.x_min; xmax = touch.x_max;
+                ymin = touch.y_min; ymax = touch.y_max;
                 if (touch.swap_axes) {
                     int t; t=rx; rx=ry; ry=t; t=xmin; xmin=ymin; ymin=t; t=xmax; xmax=ymax; ymax=t;
                 }
@@ -439,10 +474,14 @@ static void poll_touch(void) {
                 y = scale_axis(ry, ymin, ymax, screen_h - 1);
                 if (touch.mirror_x) x = screen_w - 1 - x;
                 if (touch.mirror_y) y = screen_h - 1 - y;
-                if (!touch.was_active) process_touch_point(x, y);
-                if (in_game) set_controller_mask(game_mask_at(x, y));
-            } else if (!touch.active && touch.was_active) set_controller_mask(0);
-            touch.was_active = touch.active;
+                if (!any_active) { first_x = x; first_y = y; }
+                any_active = 1;
+                if (in_game) combined_mask |= game_mask_at(x, y);
+            }
+            if (any_active && !touch.was_active) process_touch_point(first_x, first_y);
+            if (in_game) set_controller_mask(combined_mask);
+            else if (!any_active && touch.was_active) set_controller_mask(0);
+            touch.was_active = any_active;
         }
     }
 }
