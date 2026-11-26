@@ -8,6 +8,7 @@
 APPDIR="/mnt/us/nes"
 BIN="$APPDIR/bin/nes"
 BROWSE_ROOT="/mnt/us"
+export DISPLAY="${DISPLAY:-:0}"
 TMPDIR="${TMPDIR:-/var/tmp}"
 TMPBIN="$TMPDIR/kindle-nes-$$"
 LOG="$APPDIR/nes.log"
