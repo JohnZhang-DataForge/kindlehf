@@ -199,7 +199,6 @@ static gboolean on_tree_button_press(GtkWidget *widget, GdkEventButton *event, g
     picker->dragging = FALSE;
     if (row_at_event(picker, event, &full, NULL)) {
         picker->pressed_path = full;
-        picker->pressed_is_directory = is_dir;
     }
     return FALSE;
 }
