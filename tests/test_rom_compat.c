@@ -20,7 +20,7 @@ int main(void) {
     uint64_t frame_ns;
 
     assert(source != NULL);
-    memcpy(source, "NES\\x1a", 4);
+    memcpy(source, "NES\x1a", 4);
     source[4] = 8;
     source[5] = 0;
     source[6] = 0x12;
@@ -44,7 +44,7 @@ int main(void) {
     assert(prepared_size == source_size + 8192u);
     assert(prepared[4] == 8 && prepared[5] == 1);
     assert((prepared[7] & 0x0c) == 0);
-    assert(memcmp(prepared, "NES\\x1a", 4) == 0);
+    assert(memcmp(prepared, "NES\x1a", 4) == 0);
 
     ctx = xnes_ctx_alloc(prepared, prepared_size);
     assert(ctx != NULL);
