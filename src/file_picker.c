@@ -233,14 +233,16 @@ static gboolean on_tree_button_release(GtkWidget *widget, GdkEventButton *event,
     if (event->button != 1) return FALSE;
     if (picker->dragging || fabs(event->y - picker->press_y) > 5.0) {
         picker->dragging = FALSE;
-        g_clear_pointer(&picker->pressed_path, g_free);
+        g_free(picker->pressed_path);
+        picker->pressed_path = NULL;
         return TRUE;
     }
     if (!picker->pressed_path ||
         !row_at_event(picker, event, &full, &is_dir) ||
         g_strcmp0(full, picker->pressed_path) != 0) {
         g_free(full);
-        g_clear_pointer(&picker->pressed_path, g_free);
+        g_free(picker->pressed_path);
+        picker->pressed_path = NULL;
         return FALSE;
     }
 
@@ -257,7 +259,8 @@ static gboolean on_tree_button_release(GtkWidget *widget, GdkEventButton *event,
     }
 
     g_free(full);
-    g_clear_pointer(&picker->pressed_path, g_free);
+    g_free(picker->pressed_path);
+        picker->pressed_path = NULL;
     return TRUE;
 }
 
