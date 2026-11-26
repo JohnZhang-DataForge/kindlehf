@@ -16,7 +16,7 @@ Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.
 - `build.sh`: reproducible KindleHF build
 - `.github/workflows/kindlehf.yml`: public GitHub-hosted runner build and packaging
 - `tests/`: generated mapper-0 test ROM and host core/controller tests
-- `documents/NES Emulator.sh`: SH Integration scriptlet; opens the native ROM file picker at `/mnt/us`
+- `documents/NES Emulator.sh`: SH Integration scriptlet; opens the GTK2 main window
 
 ## Supported cartridge mappers
 
