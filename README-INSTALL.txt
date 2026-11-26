@@ -32,11 +32,12 @@ CONTROLS
 - Drag the list to scroll; tap a folder to enter it; tap a .nes file to launch it.
 - The picker starts at /mnt/us and remembers the last directory when returning from a game.
 - Cancel returns to the main window.
-- D-pad: lower-left.
-- A/B: lower-right.
-- SELECT/START: lower middle.
+- D-pad: lower-left; A/B: lower-right; SELECT/START: lower middle.
+- BACK: upper-left, returns to the native GTK2 main window. Tap Open Game to choose another ROM.
+- MENU: top center. Opens an in-game menu with Resume, Back to Library, and Quit Emulator.
 - PAUSE/RESUME: upper-right.
-- EXIT: upper-left, returns to the GTK2 main window. Tap Open Game to select another ROM.
+- The main-window Options information dialog is non-modal.
+- The current Kindle reports one multitouch slot, so simultaneous multi-finger button combinations may not be supported.
 
 NOTES
 -----
@@ -62,6 +63,20 @@ Tapping the launcher returns immediately:
   The frontend could not find a compatible evdev touchscreen. Device-specific
   event-node support or permissions may be required; this is not fixed by
   changing ROMs.
+
+Touch controls are visible but do not respond:
+  Inspect /mnt/us/nes/nes.log. The current diagnostic build records the selected
+  event device name and the first raw input events, then logs mapped touch
+  coordinates and NES button masks. If the log has no "NES: touch raw" lines
+  after tapping the screen, the selected evdev node is not delivering events.
+  If coordinates appear but are rotated or mirrored, the logged axis ranges and
+  swap/mirror values identify the calibration problem. Send the complete log
+  so the exact device mapping can be corrected.
+
+Cannot leave a game:
+  Tap BACK in the upper-left to return to the emulator window. Tap MENU in the
+  top center, then choose BACK TO LIBRARY or QUIT EMULATOR. PAUSE/RESUME is in
+  the upper-right; it does not exit the game.
 
 ROM does not appear:
   Confirm the file ends in .nes and is somewhere under /mnt/us. Browse into its
