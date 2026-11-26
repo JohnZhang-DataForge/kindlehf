@@ -9,6 +9,7 @@ CROSS="arm-kindlehf-linux-gnueabihf"
 TOOLCHAIN_SHA256="8cc7dfbd71abd78f9e947d6b2e20670288a4402edc7b07176bca791f7eaf87d0"
 LIBXNES_COMMIT="45cab8022732542d0a8c6eddd4fb26c393744afe"
 FBINK_COMMIT="bab62e96716ef978dab52048eb4d1c79a8eecfa7"
+KINDLE_SDK_COMMIT="b4a6c99d718a7cf74935f36105c62491b4336a61"
 PREFIX="$HOME/x-tools/$CROSS"
 ARCHIVE="$ROOT/build/kindlehf.tar.zst"
 
@@ -28,6 +29,37 @@ READELF="$PREFIX/bin/$CROSS-readelf"
 test -x "$CC"
 "$CC" --version | head -n 1
 "$CC" -dumpmachine
+
+# Build against the GTK2/GLib libraries shipped in Kindle firmware. The SDK
+# extracts the target libraries and headers into the KOX sysroot; no GTK
+# libraries are bundled into the installation package.
+SDK_DIR="$ROOT/build/kindle-sdk"
+SYSROOT="$PREFIX/$CROSS/sysroot"
+if [[ ! -d "$SDK_DIR/.git" ]]; then
+    git clone --recurse-submodules https://github.com/KindleModding/kindle-sdk "$SDK_DIR"
+fi
+git -C "$SDK_DIR" fetch --depth 1 origin "$KINDLE_SDK_COMMIT"
+git -C "$SDK_DIR" checkout --detach "$KINDLE_SDK_COMMIT"
+git -C "$SDK_DIR" submodule update --init --recursive
+
+if [[ ! -f "$SYSROOT/usr/lib/pkgconfig/gtk+-2.0.pc" ]]; then
+    # One KindleHF firmware image is sufficient to populate the GTK2 ABI
+    # sysroot; use the Scribe 5.16.3 image (same KindleHF ABI generation).
+    sed -i 's@Setup_SDK "arm-kindlehf-linux-gnueabihf" "kindlehf" "https://s3.amazonaws.com/firmwaredownloads/update_kindle_all_new_paperwhite_v2_5.16.3.bin" "https://s3.amazonaws.com/firmwaredownloads/update_kindle_scribe_5.16.3.bin"@Setup_SDK "arm-kindlehf-linux-gnueabihf" "kindlehf" "https://s3.amazonaws.com/firmwaredownloads/update_kindle_scribe_5.16.3.bin"@' "$SDK_DIR/gen-sdk.sh"
+    (cd "$SDK_DIR" && ./gen-sdk.sh kindlehf "$PREFIX")
+fi
+
+test -f "$SYSROOT/usr/lib/pkgconfig/gtk+-2.0.pc"
+export PKG_CONFIG_SYSROOT_DIR="$SYSROOT"
+export PKG_CONFIG_LIBDIR="$SYSROOT/usr/lib/pkgconfig:$SYSROOT/usr/share/pkgconfig"
+GTK_CFLAGS="$(pkg-config --cflags gtk+-2.0)"
+GTK_LIBS="$(pkg-config --libs gtk+-2.0)"
+for gtk_lib in libgtk-x11-2.0.so.0 libgdk-x11-2.0.so.0 libglib-2.0.so.0 libgobject-2.0.so.0; do
+    if ! find "$SYSROOT/lib" "$SYSROOT/usr/lib" -name "$gtk_lib" -print -quit 2>/dev/null | grep -q .; then
+        echo "Missing Kindle firmware library in SDK: $gtk_lib" >&2
+        exit 1
+    fi
+done
 
 if [[ ! -d vendor/libxnes/src ]]; then
     git clone https://github.com/xboot/libxnes vendor/libxnes
@@ -62,10 +94,10 @@ test "${#XNES_SOURCES[@]}" -gt 0
     -march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb \
     -fomit-frame-pointer -fno-strict-aliasing -ffunction-sections -fdata-sections \
     -Wall -Wextra \
-    -Ivendor/FBInk -Ivendor/libxnes/src \
-    src/main.c "${XNES_SOURCES[@]}" vendor/FBInk/Release/libfbink.a \
-    -static -Wl,--gc-sections -Wl,--no-undefined \
-    -lm -lrt -lpthread -ldl \
+    -Ivendor/FBInk -Ivendor/libxnes/src -Isrc $GTK_CFLAGS \
+    src/main.c src/file_picker.c "${XNES_SOURCES[@]}" vendor/FBInk/Release/libfbink.a \
+    -Wl,--gc-sections -Wl,--no-undefined -Wl,-rpath-link,"$SYSROOT/usr/lib" \
+    $GTK_LIBS -lm -lrt -lpthread -ldl \
     -o dist/nes
 
 "$STRIP" --strip-unneeded dist/nes
@@ -80,14 +112,19 @@ grep -Eq 'Version5 EABI|EABI5' dist/elf-header.txt
 grep -q 'Tag_CPU_arch: v7' dist/elf-attributes.txt
 grep -q 'Tag_Advanced_SIMD_arch: NEONv1' dist/elf-attributes.txt
 grep -q 'Tag_ABI_VFP_args: VFP registers' dist/elf-attributes.txt
-if grep -q 'INTERP' dist/elf-program-headers.txt; then
-    echo "Unexpected dynamic interpreter in supposedly static executable" >&2
-    exit 1
-fi
-if grep -q '(NEEDED)' dist/elf-dynamic.txt; then
-    echo "Unexpected dynamic shared-library dependency" >&2
-    exit 1
-fi
+grep -q 'INTERP' dist/elf-program-headers.txt
+grep -q 'Requesting program interpreter: /lib/ld-linux-armhf.so.3' dist/elf-program-headers.txt
+grep -q 'Shared library: \\[libgtk-x11-2.0.so.0\\]' dist/elf-dynamic.txt
+grep -q 'Shared library: \\[libgdk-x11-2.0.so.0\\]' dist/elf-dynamic.txt
+
+# Every direct ELF dependency must exist in the firmware-derived Kindle sysroot.
+while read -r needed; do
+    [[ -z "$needed" ]] && continue
+    if ! find "$SYSROOT/lib" "$SYSROOT/usr/lib" -name "$needed" -print -quit 2>/dev/null | grep -q .; then
+        echo "Unresolved Kindle runtime dependency: $needed" >&2
+        exit 1
+    fi
+done < <(sed -n 's/.*Shared library: \\[\\(.*\\)\\].*/\\1/p' dist/elf-dynamic.txt)
 
 sha256sum dist/nes | tee dist/nes.sha256
 echo "KindleHF executable build and ELF ABI checks passed."
