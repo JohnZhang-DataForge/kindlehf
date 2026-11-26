@@ -66,7 +66,7 @@ file dist/nes
 "$READELF" -d dist/nes | tee dist/elf-dynamic.txt || true
 
 grep -q 'Machine:.*ARM' dist/elf-header.txt
-grep -q 'EABI5' dist/elf-header.txt
+grep -Eq 'Version5 EABI|EABI5' dist/elf-header.txt
 grep -q 'Tag_ABI_VFP_args: VFP registers' dist/elf-attributes.txt
 if grep -q 'INTERP' dist/elf-program-headers.txt; then
     echo "Unexpected dynamic interpreter in supposedly static executable" >&2
