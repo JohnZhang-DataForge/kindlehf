@@ -1,6 +1,18 @@
 KINDLE NES — INSTALLATION
 =========================
 
+VERSION 0.1.7 — TOUCHSCREEN DIAGNOSTICS AND RECOVERY MENU
+--------------------------------------------------------
+The in-game top bar provides BACK (return to the emulator window), MENU
+(Resume / Back to Library / Quit Emulator), and PAUSE/RESUME. The main-window
+Options information dialog is non-modal.
+
+This build logs the selected touchscreen's name and capabilities, the first
+64 raw evdev events, and the first 32 mapped touch reports to
+/mnt/us/nes/nes.log. A touchscreen being discovered does not prove that it is
+delivering events. If controls do not respond, tap the screen several times,
+exit using the MENU if possible, and share the complete log for calibration.
+
 TARGET
 ------
 Kindle Basic 10th Generation (2019), jailbroken, firmware 5.16.8.
