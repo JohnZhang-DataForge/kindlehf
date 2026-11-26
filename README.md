@@ -36,7 +36,7 @@ Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08, plus K
 
 The GTK2 main window presents Open Game, Options, Fullscreen, and Quit. Open Game opens a Gambatte-K2-style dialog: Cancel button and current path at the top, a scrollable single-column list, a `..` parent row, directories first, then `.nes` files, and touch-drag scrolling that does not activate the row. Cancel returns to the main window; exiting a game also returns there. The picker starts at `/mnt/us`. ROMs can remain in any folder under `/mnt/us`; no `nes/roms/` staging folder is required. The GTK2 runtime is supplied by Kindle firmware and is dynamically linked, not bundled.
 
-## Current limitations
+## Gameplay loop\n\nThe emulator advances the NES core in bounded GLib timer callbacks while keeping the GTK2 main loop active. This avoids starving X11/GTK event dispatch after a ROM is selected and keeps the UI lifecycle responsive. Runtime diagnostics are written to `/mnt/us/nes/nes.log`.\n\n## Current limitations
 
 - No audio output.
 - Save states and battery-backed SRAM persistence are not yet wired into the frontend.
