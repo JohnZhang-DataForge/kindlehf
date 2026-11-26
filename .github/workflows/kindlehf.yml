@@ -88,9 +88,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.2 — prerelease
+          ## Kindle NES v0.1.3 — prerelease
 
-          Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
+          Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker with responsive in-game event loop for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
           ### Downloads
           - **Kindle-NES-Install.zip** — copy the `documents/` and `nes/` directories to the Kindle USB storage root.
@@ -111,7 +111,7 @@ jobs:
           - The NES CPU/PPU and cartridge emulation remain libxnes; the Game Boy core is not included.
           - GTK2/GLib/GDK libraries are dynamically linked from Kindle firmware and are not bundled.
 
-          ### Current limitations
+          ### Gameplay freeze fix\n          - Gameplay now runs in short GLib timer callbacks inside the GTK main loop instead of a blocking emulation loop. This keeps GTK/X11 event dispatch alive after ROM selection and lets the Exit/Pause touch handling remain responsive.\n          - Runtime logs include ROM selection, detected evdev touchscreen, and game-loop startup at `/mnt/us/nes/nes.log`.\n\n          ### Current limitations
           - Audio is disabled.
           - Save states and battery-backed saves are not implemented.
           - Not all NES cartridge formats and mappers are supported.
@@ -127,12 +127,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.2 >/dev/null 2>&1; then
-            gh release upload v0.1.2 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.3 >/dev/null 2>&1; then
+            gh release upload v0.1.3 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.2 "${ASSETS[@]}" \
+            gh release create v0.1.3 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.2" \
+              --title "Kindle NES v0.1.3" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
