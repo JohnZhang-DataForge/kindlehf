@@ -72,6 +72,10 @@ elif ! grep -qx "libxnes=$LIBXNES_COMMIT" vendor/UPSTREAM_VERSIONS.txt 2>/dev/nu
     exit 1
 fi
 
+# Apply the small, source-controlled mapper extension after checking out the
+# pinned upstream core. This keeps the upstream dependency reproducible.
+bash patches/apply-libxnes-mapper227.sh vendor/libxnes
+
 if [[ ! -f vendor/FBInk/fbink.c ]]; then
     git clone --recurse-submodules https://github.com/NiLuJe/FBInk vendor/FBInk
 fi
