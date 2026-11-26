@@ -164,6 +164,18 @@ static void scan_roms(void) {
     qsort(rom_names, (size_t)rom_count, sizeof(rom_names[0]), compare_names);
 }
 
+static int validate_ines_rom(const uint8_t *data, size_t len) {
+    size_t required;
+    size_t trainer;
+    if (!data || len < 16) return 0;
+    if (data[0] != 'N' || data[1] != 'E' || data[2] != 'S' || data[3] != 0x1a) return 0;
+    /* libxnes legacy iNES path expects CHR-ROM bytes; reject NES 2.0 and CHR-RAM-only files. */
+    if ((data[7] & 0x0c) != 0 || data[4] == 0 || data[5] == 0) return 0;
+    trainer = (data[6] & 0x04) ? 512u : 0u;
+    required = 16u + trainer + (size_t)data[4] * 16384u + (size_t)data[5] * 8192u;
+    return len >= required;
+}
+
 static int load_rom_named(const char *name) {
     char path[MAX_PATH_LEN];
     FILE *f;
@@ -182,6 +194,10 @@ static int load_rom_named(const char *name) {
         free(data); fclose(f); return -1;
     }
     fclose(f);
+    if (!validate_ines_rom(data, (size_t)len)) {
+        free(data);
+        return -1;
+    }
     if (nes) xnes_ctx_free(nes);
     nes = xnes_ctx_alloc(data, (size_t)len);
     free(data);
