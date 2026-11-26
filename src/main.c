@@ -268,10 +268,11 @@ static void render_game(void) {
     }
     show_raw(game_buf, game_w, game_h, game_x, game_y, WFM_A2);
     if (paused) {
-        memset(screen_buf, 255, (size_t)screen_w * screen_h);
-        rect(screen_buf, screen_w, screen_h, screen_w/2 - 125, screen_h/2 - 42, 250, 84, 0);
-        center_text(screen_buf, screen_w, screen_h, screen_h/2 - 12, "PAUSED", 3, 0);
-        show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
+        uint8_t overlay[250 * 84];
+        memset(overlay, 255, sizeof(overlay));
+        rect(overlay, 250, 84, 0, 0, 250, 84, 0);
+        center_text(overlay, 250, 84, 34, "PAUSED", 3, 0);
+        show_raw(overlay, 250, 84, screen_w/2 - 125, screen_h/2 - 42, WFM_GC16);
     }
 }
 
