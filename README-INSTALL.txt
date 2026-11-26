@@ -75,3 +75,6 @@ UNINSTALL
 ---------
 Delete /mnt/us/documents/NES Emulator.sh and /mnt/us/nes/. This does not modify
 Kindle system partitions or jailbreak files.
+
+
+If a selected ROM does not start, inspect `/mnt/us/nes/nes.log`. The log records the ROM path, size, iNES header, mapper, and exact validation/core initialization failure. The launcher returns to the ROM picker after an unsupported or invalid ROM instead of leaving a generic stock-icon dialog open.
