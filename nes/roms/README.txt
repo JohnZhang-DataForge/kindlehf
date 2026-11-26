@@ -1,1 +1,0 @@
-Place legally obtained NES ROM images ending in .nes in this directory. No copyrighted ROMs are included in this project.\n
