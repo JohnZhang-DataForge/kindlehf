@@ -78,3 +78,10 @@ Kindle system partitions or jailbreak files.
 
 
 If a selected ROM does not start, inspect `/mnt/us/nes/nes.log`. The log records the ROM path, size, iNES header, mapper, and exact validation/core initialization failure. The launcher returns to the ROM picker after an unsupported or invalid ROM instead of leaving a generic stock-icon dialog open.
+
+
+NES 2.0 / CHR-RAM compatibility:
+  Basic NES 2.0 ROMs with ordinary 16 KB PRG and 8 KB CHR bank counts are
+  normalized for the bundled libxnes core. CHR-RAM-only cartridges receive
+  writable compatibility CHR memory. Extended NES 2.0 sizes, extended mapper
+  IDs, and submappers are not yet supported.
