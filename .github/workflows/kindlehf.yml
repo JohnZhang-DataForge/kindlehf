@@ -21,11 +21,19 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential git curl zstd file binutils zip python3
+            build-essential git curl zstd file binutils zip python3 pkg-config libgtk2.0-dev xvfb libarchive-dev libssl-dev liblzma-dev libtool-bin nettle-dev
 
       - name: Host-side NES core and controller tests
         run: |
           mkdir -p build/host vendor
+          gcc -std=gnu11 -O2 -Wall -Wextra -Wno-deprecated-declarations \
+            -Isrc $(pkg-config --cflags gtk+-2.0) \
+            -c src/file_picker.c -o build/host/file_picker.o
+          gcc -std=gnu11 -O2 -Wall -Wextra -Wno-deprecated-declarations \
+            -Isrc $(pkg-config --cflags gtk+-2.0) \
+            src/file_picker.c tests/test_file_picker.c \
+            $(pkg-config --libs gtk+-2.0) -lm -o build/host/test_file_picker
+          xvfb-run -a build/host/test_file_picker
           git clone https://github.com/xboot/libxnes vendor/libxnes
           git -C vendor/libxnes checkout --detach 45cab8022732542d0a8c6eddd4fb26c393744afe
           python3 tests/make_mapper0_rom.py build/host/homebrew-mapper0.nes
@@ -80,9 +88,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > dist/RELEASE-NOTES.md <<'EOF'
-          ## Kindle NES v0.1.1 — prerelease
+          ## Kindle NES v0.1.2 — prerelease
 
-          Native ARM KindleHF NES emulator package with a native touchscreen ROM file browser for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
+          Native ARM KindleHF NES emulator package with the Gambatte-K2-style GTK2 ROM picker for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
 
           ### Downloads
           - **Kindle-NES-Install.zip** — copy the `documents/` and `nes/` directories to the Kindle USB storage root.
@@ -116,12 +124,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.1 >/dev/null 2>&1; then
-            gh release upload v0.1.1 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.2 >/dev/null 2>&1; then
+            gh release upload v0.1.2 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.1 "${ASSETS[@]}" \
+            gh release create v0.1.2 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.1" \
+              --title "Kindle NES v0.1.2" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
