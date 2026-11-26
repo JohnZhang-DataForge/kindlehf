@@ -23,7 +23,7 @@ The pinned libxnes revision includes mapper implementations for 0, 1, 2, 3, 4, 7
 
 ## Build
 
-The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolchain, verifies its SHA-256, checks out pinned FBInk and libxnes commits, compiles the ARM executable, verifies ELF/ABI attributes, runs host-side ROM/core/controller tests, and uploads the installation ZIP and source archive.
+The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolchain, verifies its SHA-256, checks out pinned FBInk and libxnes commits, compiles the ARM executable, verifies ELF/ABI attributes, runs host-side ROM/core/controller tests, and uploads the installation ZIP and a source archive containing the pinned upstream sources and license texts.
 
 For a local Linux build: `bash ./build.sh`.
 
