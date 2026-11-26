@@ -1,0 +1,38 @@
+#!/bin/sh
+# Kindle SH Integration scriptlet. Place this file in /mnt/us/documents/.
+# Native KindleHF executable; no KUAL, KPM, browser, HTML, or JavaScript.
+
+APPDIR="/mnt/us/nes"
+BIN="$APPDIR/bin/nes"
+ROMDIR="$APPDIR/roms"
+TMPDIR="\${TMPDIR:-/var/tmp}"
+TMPBIN="$TMPDIR/kindle-nes-$$"
+LOG="$APPDIR/nes.log"
+
+mkdir -p "$ROMDIR" "$APPDIR/saves" "$APPDIR/bin"
+
+if [ ! -f "$BIN" ]; then
+    echo "NES Emulator: executable not found."
+    echo "Expected: $BIN"
+    exit 1
+fi
+
+if [ ! -x "$TMPDIR" ]; then
+    TMPDIR="/tmp"
+    TMPBIN="$TMPDIR/kindle-nes-$$"
+fi
+
+cleanup() {
+    rm -f "$TMPBIN"
+}
+trap cleanup EXIT HUP INT TERM
+
+if ! cp "$BIN" "$TMPBIN" || ! chmod 700 "$TMPBIN"; then
+    echo "NES Emulator: cannot stage executable in $TMPDIR."
+    exit 1
+fi
+
+cd "$APPDIR" || exit 1
+"$TMPBIN" "$ROMDIR" >>"$LOG" 2>&1
+RC=$?
+exit "$RC"
