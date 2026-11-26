@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-kindlehf:
@@ -74,3 +74,51 @@ jobs:
             dist/elf-dynamic.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish GitHub prerelease
+        if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release]')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > dist/RELEASE-NOTES.md <<'EOF'
+          ## Kindle NES v0.1.0 — prerelease
+
+          Native ARM KindleHF NES emulator package for the jailbroken Kindle Basic 10th Generation (2019), targeting firmware 5.16.8.
+
+          ### Downloads
+          - **Kindle-NES-Install.zip** — copy the `documents/` and `nes/` directories to the Kindle USB storage root.
+          - **Kindle-NES-Source.tar.gz** — complete source snapshot and pinned upstream dependency references.
+          - **nes** — standalone stripped ARM executable.
+          - **SHA256SUMS** — checksums for the install ZIP, source archive, and executable.
+          - ELF reports — architecture, ABI attributes, program headers, and dynamic dependency inspection.
+
+          ### Validation
+          - GitHub-hosted Ubuntu 24.04 runner completed the host-side mapper-0 ROM/core/controller tests.
+          - KindleHF cross-compilation and ELF checks completed successfully.
+          - This is **not yet validated on physical Kindle hardware**. Framebuffer waveform behavior, touchscreen event discovery/permissions, orientation, and real-game performance remain device-test items.
+
+          ### Current limitations
+          - Audio is disabled.
+          - Save states and battery-backed saves are not implemented.
+          - Not all NES cartridge formats and mappers are supported.
+          EOF
+          ASSETS=(
+            dist/Kindle-NES-Install.zip
+            dist/Kindle-NES-Source.tar.gz
+            dist/SHA256SUMS
+            dist/nes
+            dist/nes.sha256
+            dist/elf-header.txt
+            dist/elf-attributes.txt
+            dist/elf-program-headers.txt
+            dist/elf-dynamic.txt
+          )
+          if gh release view v0.1.0 >/dev/null 2>&1; then
+            gh release upload v0.1.0 "${ASSETS[@]}" --clobber
+          else
+            gh release create v0.1.0 "${ASSETS[@]}" \
+              --target "$GITHUB_SHA" \
+              --title "Kindle NES v0.1.0" \
+              --prerelease \
+              --notes-file dist/RELEASE-NOTES.md
+          fi
