@@ -1,11 +1,14 @@
 KINDLE NES — INSTALLATION
 =========================
 
-VERSION 0.1.7 — TOUCHSCREEN DIAGNOSTICS AND RECOVERY MENU
+VERSION 0.1.8 — CLEANER TOUCH CONTROLS AND SCREEN LAYOUT
 --------------------------------------------------------
 The in-game top bar provides BACK (return to the emulator window), MENU
 (Resume / Back to Library / Quit Emulator), and PAUSE/RESUME. The main-window
-Options information dialog is non-modal.
+Options information dialog is non-modal. The game viewport starts below the
+toolbar so gameplay refreshes cannot overwrite the top-bar labels. D-pad
+direction letters sit inside their respective arms, and SELECT/START are
+larger, centered high-contrast buttons.
 
 This build logs the selected touchscreen's name and capabilities, the first
 64 raw evdev events, and the first 32 mapped touch reports to
