@@ -995,7 +995,7 @@ int main(int argc, char **argv) {
             gtk_widget_hide(main_window);
             touch.was_active = 0;
             next_game_update_ns = 0;
-            fprintf(stderr, "NES: game core ready; scheduling initial UI refresh after GTK main loop starts\\n");
+            fprintf(stderr, "NES: game core ready; scheduling initial UI refresh after GTK main loop starts\n");
             fflush(stderr);
             g_idle_add(begin_game_display, NULL);
             gtk_main();
