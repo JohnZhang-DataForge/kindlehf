@@ -2,6 +2,8 @@
 
 Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.16.3 or newer. First target: Kindle Basic 10th Generation (2019), firmware 5.16.8.
 
+The GTK2 shell and ROM picker follow the Gambatte-K2 interaction model; only the frontend/UI is reused as a design reference. NES CPU, PPU, cartridge and mapper emulation are provided by the independent libxnes core.
+
 - NES core: pinned xboot/libxnes (CPU, PPU, cartridge/mapper emulation)
 - Display: FBInk raw framebuffer output for gameplay; Kindle GTK2/X11 window for the ROM picker
 - Input: Linux evdev touchscreen
