@@ -43,7 +43,7 @@ static struct xnes_ctx_t *nes;
 static GtkWidget *main_window;
 static int picker_requested;
 static int in_game, paused, menu_open;
-static unsigned touch_debug_events, touch_debug_reports;
+static unsigned touch_debug_events, touch_debug_reports, touch_debug_downs;
 static volatile sig_atomic_t quitting;
 static uint64_t next_game_update_ns;
 
@@ -293,11 +293,12 @@ static void draw_game_ui(void) {
     fill_rect(screen_buf, screen_w, screen_h, cx - r/3, cy - r/3, 2*r/3, 2*r/3, 0);
     fill_rect(screen_buf, screen_w, screen_h, cx - r, cy - r/5, 2*r, 2*r/5, 0);
     fill_rect(screen_buf, screen_w, screen_h, cx - r/5, cy - r, 2*r/5, 2*r, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx - 13, cy - 7, "D", 2, 255);
-    draw_text(screen_buf, screen_w, screen_h, cx - r/2, cy - r - 18, "U", 2, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx - r/2, cy + r + 5, "D", 2, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx - r - 18, cy - 7, "L", 2, 0);
-    draw_text(screen_buf, screen_w, screen_h, cx + r + 5, cy - 7, "R", 2, 0);
+    /* Put direction labels inside the black D-pad arms so they stay clear
+       of the game viewport and remain legible on the e-ink display. */
+    draw_text(screen_buf, screen_w, screen_h, cx - 5, cy - r/2 - 7, "U", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, cx - 5, cy + r/2 - 7, "D", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, cx - r/2 - 5, cy - 7, "L", 2, 255);
+    draw_text(screen_buf, screen_w, screen_h, cx + r/2 - 5, cy - 7, "R", 2, 255);
 
     cx = screen_w * 76 / 100; cy = screen_h * 84 / 100; r = screen_w * 7 / 100;
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
@@ -306,8 +307,10 @@ static void draw_game_ui(void) {
     circle(screen_buf, screen_w, screen_h, cx, cy, r, 0, 0);
     draw_text(screen_buf, screen_w, screen_h, cx - 7, cy - 7, "B", 2, 0);
 
+    fill_rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*78/100, screen_w*13/100, 30, 232);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*78/100, screen_w*13/100, 30, 0);
-    draw_text(screen_buf, screen_w, screen_h, screen_w*45/100, screen_h*78/100 + 10, "SEL", 1, 0);
+    draw_text(screen_buf, screen_w, screen_h, screen_w*44/100, screen_h*78/100 + 10, "SELECT", 1, 0);
+    fill_rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 232);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 0);
     draw_text(screen_buf, screen_w, screen_h, screen_w*44/100, screen_h*84/100 + 10, "START", 1, 0);
     show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
@@ -622,8 +625,11 @@ static void poll_touch(void) {
                 touch_debug_reports++;
             }
             if (any_active && !touch.was_active) {
-                fprintf(stderr, "NES: touch down mapped=%d,%d\n", first_x, first_y);
-                fflush(stderr);
+                if (touch_debug_downs < 32) {
+                    fprintf(stderr, "NES: touch down mapped=%d,%d\n", first_x, first_y);
+                    fflush(stderr);
+                    touch_debug_downs++;
+                }
                 process_touch_point(first_x, first_y);
             }
             if (in_game) set_controller_mask(combined_mask);
@@ -859,17 +865,17 @@ int main(int argc, char **argv) {
 
     screen_buf = (uint8_t *)malloc((size_t)screen_w * screen_h);
     if (!screen_buf) { munmap(fb_mem, fb_mem_len); fb_mem = NULL; fbink_close(fbfd); return 2; }
-    game_w = screen_w - 40;
-    game_h = game_w * 240 / 256;
-    if (game_h > screen_h - 260) { game_h = screen_h - 260; game_w = game_h * 256 / 240; }
-    game_x = (screen_w - game_w) / 2;
-    game_y = 56;
-    if (game_y + game_h > screen_h - 220) {
-        game_y = 30;
-        game_h = screen_h - 260;
-        game_w = game_h * 256 / 240;
-        game_x = (screen_w - game_w) / 2;
+    /* Reserve a clean top toolbar and a separate bottom controller zone.
+       The old fallback moved the game to y=30, causing it to overwrite the
+       lower half of BACK/MENU/PAUSE on a 600x800 Kindle screen. */
+    game_y = 60;
+    game_h = screen_h - 270;
+    game_w = game_h * 256 / 240;
+    if (game_w > screen_w - 24) {
+        game_w = screen_w - 24;
+        game_h = game_w * 240 / 256;
     }
+    game_x = (screen_w - game_w) / 2;
     game_buf = (uint8_t *)malloc((size_t)game_w * game_h);
     if (!game_buf) { free(screen_buf); munmap(fb_mem, fb_mem_len); fb_mem = NULL; fbink_close(fbfd); return 2; }
 
