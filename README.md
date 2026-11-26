@@ -5,7 +5,7 @@ Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.
 - NES core: pinned xboot/libxnes (CPU, PPU, cartridge/mapper emulation)
 - Display: FBInk raw framebuffer output
 - Input: Linux evdev touchscreen
-- UI: native framebuffer; no browser, HTML, JavaScript, KUAL, or KPM launcher
+- UI: native framebuffer file picker; browse folders under `/mnt/us` and tap any `.nes` file; no ROM staging folder required
 - Audio: disabled
 - E-ink: 7 emulated frames per display update; monochrome Bayer conversion and A2 game updates. Not 60 Hz display output.
 
@@ -15,7 +15,7 @@ Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.
 - `build.sh`: reproducible KindleHF build
 - `.github/workflows/kindlehf.yml`: public GitHub-hosted runner build and packaging
 - `tests/`: generated mapper-0 test ROM and host core/controller tests
-- `documents/NES Emulator.sh`: SH Integration scriptlet
+- `documents/NES Emulator.sh`: SH Integration scriptlet; opens the native ROM file picker at `/mnt/us`
 
 ## Supported cartridge mappers
 
@@ -28,6 +28,10 @@ The public GitHub Actions workflow downloads the pinned KOReader KindleHF toolch
 For a local Linux build: `bash ./build.sh`.
 
 Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08. The compiler flags follow KOX's KHF target: `-march=armv7-a -mtune=cortex-a7 -mfpu=neon -mfloat-abi=hard -mthumb`. KindleHF is the target documented for Kindle firmware >= 5.16.3. Do not substitute `kindlepw2`.
+
+## ROM file picker
+
+The native touchscreen browser starts at `/mnt/us`, lists folders and `.nes` files, sorts folders first, and supports parent-folder navigation and paging. It does not follow symbolic links, so browsing remains inside the Kindle USB storage tree. ROMs can remain in any folder under `/mnt/us`; there is no requirement to copy them into `nes/roms/`.
 
 ## Current limitations
 
