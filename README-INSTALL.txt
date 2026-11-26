@@ -22,13 +22,15 @@ EXPECTED DEVICE PATHS
 /mnt/us/nes/saves/
 
 The launcher stages the executable under /var/tmp before running it because USB
-storage may be mounted noexec. Runtime diagnostics are appended to:
+storage may be mounted noexec. It defaults DISPLAY to :0 for the Kindle GTK2 window manager. Runtime diagnostics are appended to:
 /mnt/us/nes/nes.log
 
 CONTROLS
 --------
-- Browse folders in the native file picker; tap any .nes file to start.
-- ROOT returns to the Kindle USB storage root; UP goes to the parent folder.
+- The GTK2 ROM picker follows the Gambatte-K2 interface: Cancel + current path at the top, scrollable file list, parent row (..), folders first, then .nes files.
+- Drag the list to scroll; tap a folder to enter it; tap a .nes file to launch it.
+- The picker starts at /mnt/us and remembers the last directory when returning from a game.
+- Cancel closes the emulator.
 - D-pad: lower-left.
 - A/B: lower-right.
 - SELECT/START: lower middle.
