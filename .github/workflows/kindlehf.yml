@@ -104,8 +104,9 @@ jobs:
           - ELF reports — architecture, ABI attributes, program headers, and dynamic dependency inspection.
 
           ### Validation
-          - GitHub-hosted Ubuntu 24.04 runner completed the host-side mapper-0 ROM/core/controller tests.
+          - GitHub-hosted Ubuntu 24.04 runner completed the mapper-0 ROM/core/controller tests and the NES 2.0 MMC1/CHR-RAM compatibility test (normalization, core initialization, CHR read/write, and frame step).
           - KindleHF cross-compilation and ELF checks completed successfully.
+          - The compatibility test uses an original synthetic MMC1 test cartridge, not the user's commercial Zelda ROM. The new build still requires confirmation on the physical Kindle with that exact ROM.
           - This is **not yet validated on physical Kindle hardware**. Framebuffer waveform behavior, touchscreen event discovery/permissions, orientation, and real-game performance remain device-test items.
 
           ### Interface and ROM selection
@@ -145,12 +146,12 @@ jobs:
             dist/elf-program-headers.txt
             dist/elf-dynamic.txt
           )
-          if gh release view v0.1.4 >/dev/null 2>&1; then
-            gh release upload v0.1.4 "${ASSETS[@]}" --clobber
+          if gh release view v0.1.5 >/dev/null 2>&1; then
+            gh release upload v0.1.5 "${ASSETS[@]}" --clobber
           else
-            gh release create v0.1.4 "${ASSETS[@]}" \
+            gh release create v0.1.5 "${ASSETS[@]}" \
               --target "$GITHUB_SHA" \
-              --title "Kindle NES v0.1.4" \
+              --title "Kindle NES v0.1.5" \
               --prerelease \
               --notes-file dist/RELEASE-NOTES.md
           fi
