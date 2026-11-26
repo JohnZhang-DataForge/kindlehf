@@ -5,7 +5,7 @@ Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.
 - NES core: pinned xboot/libxnes (CPU, PPU, cartridge/mapper emulation)
 - Display: FBInk raw framebuffer output for gameplay; Kindle GTK2/X11 window for the ROM picker
 - Input: Linux evdev touchscreen
-- UI: native GTK2 file picker modeled on Gambatte-K2 `SimpleFilePicker` (Cancel + path, scrollable list, `..`, folders first, touch-drag scrolling); lists `.nes` files only
+- UI: GTK2 frontend with Open Game / Options / Fullscreen / Quit toolbar, plus Gambatte-K2-style `SimpleFilePicker` (Cancel + path, scrollable list, `..`, folders first, touch-drag scrolling); lists `.nes` files only
 - Audio: disabled
 - E-ink: 7 emulated frames per display update; monochrome Bayer conversion and A2 game updates. Not 60 Hz display output.
 
@@ -32,7 +32,7 @@ Toolchain: `arm-kindlehf-linux-gnueabihf`, KOReader koxtoolchain 2026.08, plus K
 
 ## ROM file picker
 
-The picker starts at `/mnt/us` and follows the Gambatte-K2 dialog layout: Cancel button and current path at the top, a scrollable single-column list, a `..` parent row, directories first, then `.nes` files, and touch-drag scrolling that does not activate the row. ROMs can remain in any folder under `/mnt/us`; no `nes/roms/` staging folder is required. The GTK2 runtime is supplied by Kindle firmware and is dynamically linked, not bundled.
+The GTK2 main window presents Open Game, Options, Fullscreen, and Quit. Open Game opens a Gambatte-K2-style dialog: Cancel button and current path at the top, a scrollable single-column list, a `..` parent row, directories first, then `.nes` files, and touch-drag scrolling that does not activate the row. Cancel returns to the main window; exiting a game also returns there. The picker starts at `/mnt/us`. ROMs can remain in any folder under `/mnt/us`; no `nes/roms/` staging folder is required. The GTK2 runtime is supplied by Kindle firmware and is dynamically linked, not bundled.
 
 ## Current limitations
 
