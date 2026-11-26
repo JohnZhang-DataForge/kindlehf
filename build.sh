@@ -29,18 +29,28 @@ test -x "$CC"
 "$CC" --version | head -n 1
 "$CC" -dumpmachine
 
-if [[ ! -d vendor/libxnes/.git ]]; then
+if [[ ! -d vendor/libxnes/src ]]; then
     git clone https://github.com/xboot/libxnes vendor/libxnes
 fi
-git -C vendor/libxnes fetch --depth 1 origin "$LIBXNES_COMMIT"
-git -C vendor/libxnes checkout --detach "$LIBXNES_COMMIT"
+if [[ -d vendor/libxnes/.git ]]; then
+    git -C vendor/libxnes fetch --depth 1 origin "$LIBXNES_COMMIT"
+    git -C vendor/libxnes checkout --detach "$LIBXNES_COMMIT"
+elif ! grep -qx "libxnes=$LIBXNES_COMMIT" vendor/UPSTREAM_VERSIONS.txt 2>/dev/null; then
+    echo "Bundled libxnes source is not pinned to $LIBXNES_COMMIT" >&2
+    exit 1
+fi
 
-if [[ ! -d vendor/FBInk/.git ]]; then
+if [[ ! -f vendor/FBInk/fbink.c ]]; then
     git clone --recurse-submodules https://github.com/NiLuJe/FBInk vendor/FBInk
 fi
-git -C vendor/FBInk fetch --depth 1 origin "$FBINK_COMMIT"
-git -C vendor/FBInk checkout --detach "$FBINK_COMMIT"
-git -C vendor/FBInk submodule update --init --recursive
+if [[ -d vendor/FBInk/.git ]]; then
+    git -C vendor/FBInk fetch --depth 1 origin "$FBINK_COMMIT"
+    git -C vendor/FBInk checkout --detach "$FBINK_COMMIT"
+    git -C vendor/FBInk submodule update --init --recursive
+elif ! grep -qx "FBInk=$FBINK_COMMIT" vendor/UPSTREAM_VERSIONS.txt 2>/dev/null; then
+    echo "Bundled FBInk source is not pinned to $FBINK_COMMIT" >&2
+    exit 1
+fi
 
 make -C vendor/FBInk cleanstaticlib || true
 make -C vendor/FBInk staticlib KINDLE=1 MINIMAL=1 CROSS_TC="$CROSS"
