@@ -95,7 +95,7 @@ test "${#XNES_SOURCES[@]}" -gt 0
     -fomit-frame-pointer -fno-strict-aliasing -ffunction-sections -fdata-sections \
     -Wall -Wextra \
     -Ivendor/FBInk -Ivendor/libxnes/src -Isrc $GTK_CFLAGS \
-    src/main.c src/file_picker.c "${XNES_SOURCES[@]}" vendor/FBInk/Release/libfbink.a \
+    src/main.c src/file_picker.c src/rom_compat.c "${XNES_SOURCES[@]}" vendor/FBInk/Release/libfbink.a \
     -Wl,--gc-sections -Wl,--no-undefined -Wl,-rpath-link,"$SYSROOT/usr/lib" \
     $GTK_LIBS -lm -lrt -lpthread -ldl \
     -o dist/nes
