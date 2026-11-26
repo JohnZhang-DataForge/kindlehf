@@ -131,7 +131,7 @@ static void draw_text(uint8_t *buf, int w, int h, int x, int y, const char *s, i
         const uint8_t *g = glyph_for(s[i]);
         if (!g) continue;
         for (col = 0; col < 5; col++) for (row = 0; row < 7; row++) {
-            if (!(g[col] & (1u << (6-row)))) continue;
+            if (!(g[col] & (1u << row))) continue;
             for (dy = 0; dy < scale; dy++) for (dx = 0; dx < scale; dx++) {
                 int px = x + col*scale + dx, py = y + row*scale + dy;
                 if (px >= 0 && px < w && py >= 0 && py < h) buf[(size_t)py*w + px] = c;
@@ -313,7 +313,6 @@ static void draw_game_ui(void) {
     fill_rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 232);
     rect(screen_buf, screen_w, screen_h, screen_w*43/100, screen_h*84/100, screen_w*13/100, 30, 0);
     draw_text(screen_buf, screen_w, screen_h, screen_w*43/100 + (screen_w*13/100 - 58)/2, screen_h*84/100 + 8, "START", 2, 0);
-    show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
 }
 
 static void draw_game_menu(void) {
@@ -338,7 +337,7 @@ static void draw_game_menu(void) {
     free(panel);
 }
 
-static void render_game(void) {
+static void render_game(int full_refresh) {
     static const uint8_t bayer[4][4] = {
         {0,8,2,10}, {12,4,14,6}, {3,11,1,9}, {15,7,13,5}
     };
@@ -365,7 +364,19 @@ static void render_game(void) {
         fflush(stderr);
     }
     rendered_frames++;
-    show_raw(game_buf, game_w, game_h, game_x, game_y, WFM_A2);
+    if (full_refresh) {
+        int row;
+        /* Compose the first frame and controls into one full-screen update.
+           Two back-to-back e-ink refreshes at ROM launch could leave the
+           controller area stale until the next touch-triggered redraw. */
+        for (row = 0; row < game_h; row++) {
+            memcpy(screen_buf + (size_t)(game_y + row) * screen_w + game_x,
+                   game_buf + (size_t)row * game_w, (size_t)game_w);
+        }
+        show_raw(screen_buf, screen_w, screen_h, 0, 0, WFM_GC16);
+    } else {
+        show_raw(game_buf, game_w, game_h, game_x, game_y, WFM_A2);
+    }
     if (paused && !menu_open) {
         uint8_t overlay[250 * 84];
         memset(overlay, 255, sizeof(overlay));
@@ -520,7 +531,7 @@ static void process_touch_point(int x, int y) {
             menu_open = 0;
             paused = 0;
             draw_game_ui();
-            render_game();
+            render_game(1);
             fprintf(stderr, "NES: in-game menu action=resume\\n");
         } else if (rel_y >= library_y && rel_y < library_y + button_h) {
             fprintf(stderr, "NES: in-game menu action=back-to-library\\n");
@@ -553,7 +564,7 @@ static void process_touch_point(int x, int y) {
                     paused ? "pause" : "resume", x, y);
             fflush(stderr);
             draw_game_ui();
-            render_game();
+            render_game(1);
         }
     }
 }
@@ -682,7 +693,7 @@ static gboolean game_tick(gpointer user_data) {
         poll_touch();
     }
 
-    if (in_game && nes && !paused && !quitting) render_game();
+    if (in_game && nes && !paused && !quitting) render_game(0);
 
     now = monotonic_ns();
     if (batch_ns == 0) batch_ns = 116666667ULL;
@@ -928,7 +939,7 @@ int main(int argc, char **argv) {
             touch.was_active = 0;
             next_game_update_ns = monotonic_ns();
             draw_game_ui();
-            render_game();
+            render_game(1);
             fprintf(stderr, "NES: game started; entering GTK-integrated emulation loop\n");
             fflush(stderr);
             g_timeout_add(2, game_tick, NULL);
