@@ -37,6 +37,10 @@ int main(void) {
     assert(cart->mapper.cpu_read(ctx, 0x8000) == 0);
     assert(cart->mapper.cpu_read(ctx, 0xc000) == 0);
 
+    /* O=0 leaves the fixed 8K CHR-RAM writable. */
+    cart->mapper.ppu_write(ctx, 0x0123, 0x5a);
+    assert(cart->mapper.ppu_read(ctx, 0x0123) == 0x5a);
+
     /* 16K switchable bank 5, fixed high bank 0. */
     cart->mapper.cpu_write(ctx, (uint16_t)(0x8000u | (5u << 2)), 0xff);
     assert(cart->mapper.cpu_read(ctx, 0x8000) == 5);
@@ -53,8 +57,8 @@ int main(void) {
     assert(cart->mapper.cpu_read(ctx, 0x8000) == 4);
     assert(cart->mapper.cpu_read(ctx, 0xc000) == 5);
 
-    /* Mapper 227 exposes one fixed 8K CHR-RAM window. */
-    cart->mapper.ppu_write(ctx, 0x0123, 0x5a);
+    /* O=1 protects the CHR-RAM on the standard multicart board. */
+    cart->mapper.ppu_write(ctx, 0x0123, 0xa5);
     assert(cart->mapper.ppu_read(ctx, 0x0123) == 0x5a);
 
     xnes_ctx_free(ctx);
