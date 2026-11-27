@@ -1,1 +1,10 @@
 /build/\n/dist/\n/vendor/\n*.o\n*.a\n*.elf\n
+*.nes
+*.unf
+*.unif
+*.fds
+*.nsf
+*.rom
+/rom/
+/roms/
+/ROMs/
