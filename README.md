@@ -1,6 +1,6 @@
-# Kindle NES (native KindleHF)
+# KindleHF 8-bit Console Emulator (NES-compatible)
 
-Native C NES emulator frontend for jailbroken Kindle devices running firmware 5.16.3 or newer. First target: Kindle Basic 10th Generation (2019), firmware 5.16.8.
+Native C NES-compatible emulator frontend for jailbroken Kindle devices running firmware 5.16.3 or newer. First target: Kindle Basic 10th Generation (2019), firmware 5.16.8. See [legal.md](legal.md) for ROM, copyright, trademark, and third-party license notices.
 
 The GTK2 shell and ROM picker follow the Gambatte-K2 interaction model; only the frontend/UI is reused as a design reference. NES CPU, PPU, cartridge and mapper emulation are provided by the independent libxnes core.
 
