@@ -69,6 +69,7 @@ jobs:
           install -m 0755 "documents/NES Emulator.sh" "$PKG/documents/NES Emulator.sh"
           install -m 0755 dist/nes "$PKG/nes/bin/nes"
           cp README-INSTALL.txt "$PKG/README-INSTALL.txt"
+          cp legal.md "$PKG/legal.md"
           cp COPYING LICENSE-NOTES.txt "$PKG/"
           cp THIRD_PARTY_LICENSES/libxnes-MIT.txt "$PKG/THIRD_PARTY_LICENSES/"
           cp nes/saves/README.txt "$PKG/nes/saves/README.txt"
