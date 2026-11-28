@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Project Documentation
+    url: https://github.com/JohnZhang-DataForge/kindlehf#readme
+    about: Check supported devices, current limitations, and troubleshooting information.
+  - name: Contribution Guidelines
+    url: https://github.com/JohnZhang-DataForge/kindlehf/blob/main/CONTRIBUTING.md
+    about: Read the rules for proposing changes and contributing code.
+  - name: Legal and ROM Policy
+    url: https://github.com/JohnZhang-DataForge/kindlehf/blob/main/legal.md
+    about: Review copyright, ROM, firmware, and third-party license guidance.

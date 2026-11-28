@@ -1,0 +1,111 @@
+name: "Emulator Crash / Freeze"
+description: "Report startup failures, crashes, freezes, black screens, or unexpected exits."
+title: "[CRASH]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when KindleHF crashes, freezes, shows a black screen,
+        fails to start, or becomes unresponsive.
+
+        Please do not attach commercial ROMs, BIOS files, Kindle firmware,
+        or other copyrighted assets. A game title and diagnostic log are enough.
+
+  - type: dropdown
+    id: crash_point
+    attributes:
+      label: When does the problem happen?
+      options:
+        - KindleHF does not launch
+        - When opening the ROM picker
+        - When selecting or loading a ROM
+        - Immediately after gameplay starts
+        - During gameplay
+        - When pausing or resuming
+        - When opening Options or Fullscreen
+        - When exiting a game
+        - When quitting KindleHF
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What happens?
+      options:
+        - Application closes unexpectedly
+        - Entire device or UI freezes
+        - Black screen
+        - Stuck on loading screen
+        - Controls stop responding
+        - Returns to the Kindle home screen
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Launch KindleHF.
+        2. Select a game.
+        3. Wait for gameplay to start.
+        4. The application freezes.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does it happen?
+      options:
+        - Every time
+        - Most of the time
+        - Occasionally
+        - Happened once
+    validations:
+      required: true
+
+  - type: input
+    id: game
+    attributes:
+      label: Game / ROM Title
+      description: Provide the title and region/revision if known. Do not upload the ROM.
+      placeholder: Super Mario Bros. (USA) (Rev 1)
+
+  - type: input
+    id: version
+    attributes:
+      label: KindleHF Version or Commit
+      placeholder: v1.0.0 or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Kindle Model and Firmware
+      placeholder: Kindle Basic 10th Gen (2019), firmware 5.16.8
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Crash / Runtime Logs
+      description: Paste relevant output from /mnt/us/nes/nes.log. Remove personal information first.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Information
+      description: Add error messages, photos, or a short video if available.
+    validations:
+      required: false
