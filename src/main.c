@@ -831,6 +831,7 @@ static void on_options_clicked(GtkButton *button, gpointer user_data) {
                                     GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
                                     GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
                                     "Display: Fullscreen is enabled at launch. Use Exit Fullscreen to return to windowed mode.\n\n"
+                                    "Kindle system toolbar: Swipe down from the top edge to reveal Kindle's system UI while fullscreen.\n\n"
                                     "Audio: Disabled in this version.\n\n"
                                     "Controls: Touchscreen controls are shown while a game is running. "
                                     "Tap MENU for Resume, Back to Library, or Quit Emulator.\n\n"
