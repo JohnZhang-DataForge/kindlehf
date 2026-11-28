@@ -1,0 +1,114 @@
+name: "Game Compatibility Report"
+description: "Report an NES game that does not load or behaves incorrectly."
+title: "[COMPAT]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to report a game that fails to load or has incorrect
+        graphics, controls, or gameplay in KindleHF.
+
+        **Do not upload, attach, or link to ROM files.** You may provide the
+        game's title, ROM format, mapper information, and SHA-256 hash to help
+        identify the exact dump without distributing copyrighted content.
+
+  - type: input
+    id: game
+    attributes:
+      label: Game Title
+      description: Include region and revision when known.
+      placeholder: The Legend of Zelda (USA)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: rom_format
+    attributes:
+      label: ROM Format
+      options:
+        - iNES
+        - NES 2.0
+        - Unknown
+    validations:
+      required: true
+
+  - type: input
+    id: mapper
+    attributes:
+      label: Mapper / Submapper
+      description: If known, provide the mapper and submapper number.
+      placeholder: Mapper 1, submapper 0
+
+  - type: input
+    id: rom_hash
+    attributes:
+      label: ROM SHA-256 (Optional)
+      description: A hash helps identify the exact file without sharing it.
+      placeholder: 64-character SHA-256 hash
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Compatibility Problem
+      options:
+        - Game does not appear in the file picker
+        - ROM fails to load
+        - Black screen or no gameplay
+        - Incorrect graphics or rendering
+        - Game freezes or crashes
+        - Controls or input do not work
+        - Game runs but has incorrect behavior
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed Behavior
+      description: What happens when you try to run the game?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen?
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: KindleHF Version or Commit
+      placeholder: v1.0.0 or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Kindle Model and Firmware
+      placeholder: Kindle Basic 10th Gen (2019), firmware 5.16.8
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Include relevant ROM-loading or mapper diagnostics from /mnt/us/nes/nes.log. Remove personal information first.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: legal
+    attributes:
+      label: ROM and Copyright Notice
+      options:
+        - label: I have not attached, uploaded, or linked to the ROM file, BIOS, or copyrighted game assets.
+          required: true
