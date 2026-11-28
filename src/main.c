@@ -191,11 +191,11 @@ static int show_raw(uint8_t *buf, int w, int h, int x, int y, WFM_MODE_INDEX_T w
     if (waveform == WFM_GC16) {
         int wait_rc = fbink_wait_for_complete(fbfd, 0U);
         if (wait_rc < 0) {
-            fprintf(stderr, "NES: GC16 refresh completion wait returned %d; continuing\\n",
+            fprintf(stderr, "NES: GC16 refresh completion wait returned %d; continuing\n",
                     wait_rc);
             fflush(stderr);
         } else if (display_submit_count <= 3) {
-            fprintf(stderr, "NES: GC16 refresh completed before next update\\n");
+            fprintf(stderr, "NES: GC16 refresh completed before next update\n");
             fflush(stderr);
         }
     }
@@ -553,12 +553,12 @@ static void process_touch_point(int x, int y) {
             paused = 0;
             draw_game_ui();
             render_game(1);
-            fprintf(stderr, "NES: in-game menu action=resume\\n");
+            fprintf(stderr, "NES: in-game menu action=resume\n");
         } else if (rel_y >= library_y && rel_y < library_y + button_h) {
-            fprintf(stderr, "NES: in-game menu action=back-to-library\\n");
+            fprintf(stderr, "NES: in-game menu action=back-to-library\n");
             exit_game();
         } else if (rel_y >= quit_y && rel_y < quit_y + button_h) {
-            fprintf(stderr, "NES: in-game menu action=quit-emulator\\n");
+            fprintf(stderr, "NES: in-game menu action=quit-emulator\n");
             quitting = 1;
             exit_game();
         }
@@ -797,7 +797,7 @@ static void on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
     gboolean fullscreen = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
 
     if (fullscreen) {
-        fprintf(stderr, "NES: launcher action=fullscreen enabled size=%dx%d\\n",
+        fprintf(stderr, "NES: launcher action=fullscreen enabled size=%dx%d\n",
                 screen_w, screen_h);
         /*
          * Ask the window manager for fullscreen first. Kindle's lightweight
@@ -811,7 +811,7 @@ static void on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
         gtk_window_resize(window, screen_w, screen_h);
         gtk_button_set_label(button, "Exit Fullscreen");
     } else {
-        fprintf(stderr, "NES: launcher action=fullscreen disabled\\n");
+        fprintf(stderr, "NES: launcher action=fullscreen disabled\n");
         gtk_window_unfullscreen(window);
         gtk_window_set_decorated(window, TRUE);
         gtk_window_set_resizable(window, TRUE);
@@ -829,16 +829,16 @@ static void on_options_clicked(GtkButton *button, gpointer user_data) {
     GtkWidget *dialog;
     (void)button;
 
-    fprintf(stderr, "NES: launcher action=open-options\\n");
+    fprintf(stderr, "NES: launcher action=open-options\n");
     fflush(stderr);
 
     dialog = gtk_message_dialog_new(GTK_WINDOW(user_data),
                                     GTK_DIALOG_DESTROY_WITH_PARENT,
                                     GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
-                                    "Audio output is currently disabled.\\n\\n"
+                                    "Audio output is currently disabled.\n\n"
                                     "Touchscreen controls are displayed while a game is running. "
                                     "Tap MENU on the game screen to Resume, return to the game "
-                                    "library, or Quit the emulator.\\n\\n"
+                                    "library, or Quit the emulator.\n\n"
                                     "ROM files must be stored under /mnt/us.");
     gtk_window_set_title(GTK_WINDOW(dialog), "NES Options");
     gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
