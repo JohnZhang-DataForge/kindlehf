@@ -191,11 +191,11 @@ static int show_raw(uint8_t *buf, int w, int h, int x, int y, WFM_MODE_INDEX_T w
     if (waveform == WFM_GC16) {
         int wait_rc = fbink_wait_for_complete(fbfd, 0U);
         if (wait_rc < 0) {
-            fprintf(stderr, "NES: GC16 refresh completion wait returned %d; continuing\\n",
+            fprintf(stderr, "NES: GC16 refresh completion wait returned %d; continuing\n",
                     wait_rc);
             fflush(stderr);
         } else if (display_submit_count <= 3) {
-            fprintf(stderr, "NES: GC16 refresh completed before next update\\n");
+            fprintf(stderr, "NES: GC16 refresh completed before next update\n");
             fflush(stderr);
         }
     }
@@ -553,12 +553,12 @@ static void process_touch_point(int x, int y) {
             paused = 0;
             draw_game_ui();
             render_game(1);
-            fprintf(stderr, "NES: in-game menu action=resume\\n");
+            fprintf(stderr, "NES: in-game menu action=resume\n");
         } else if (rel_y >= library_y && rel_y < library_y + button_h) {
-            fprintf(stderr, "NES: in-game menu action=back-to-library\\n");
+            fprintf(stderr, "NES: in-game menu action=back-to-library\n");
             exit_game();
         } else if (rel_y >= quit_y && rel_y < quit_y + button_h) {
-            fprintf(stderr, "NES: in-game menu action=quit-emulator\\n");
+            fprintf(stderr, "NES: in-game menu action=quit-emulator\n");
             quitting = 1;
             exit_game();
         }
@@ -792,21 +792,67 @@ static gboolean on_main_window_delete(GtkWidget *widget, GdkEvent *event, gpoint
     return TRUE;
 }
 
-static void on_fullscreen_toggled(GtkToggleButton *button, gpointer user_data) {
+static int launcher_fullscreen = 1;
+
+static void on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
     GtkWindow *window = GTK_WINDOW(user_data);
-    if (gtk_toggle_button_get_active(button)) gtk_window_fullscreen(window);
-    else gtk_window_unfullscreen(window);
+    gboolean fullscreen = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+
+    launcher_fullscreen = fullscreen ? 1 : 0;
+    if (fullscreen) {
+        fprintf(stderr, "NES: launcher action=fullscreen enabled (window-manager geometry)\n");
+        /*
+         * Let Kindle's window manager choose the usable fullscreen geometry.
+         * Do not force framebuffer dimensions, remove decorations manually, or
+         * move the X11 window: the framebuffer can include areas reserved for
+         * Kindle's system UI, which causes cropped launcher content.
+         */
+        gtk_window_fullscreen(window);
+        gtk_button_set_label(button, "Exit Fullscreen");
+    } else {
+        fprintf(stderr, "NES: launcher action=fullscreen disabled; restoring windowed mode\n");
+        gtk_window_unfullscreen(window);
+        gtk_button_set_label(button, "Fullscreen");
+    }
+
+    gtk_window_present(window);
+    fflush(stderr);
 }
 
 static void on_options_clicked(GtkButton *button, gpointer user_data) {
     GtkWidget *dialog;
+    gint response;
     (void)button;
-    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_DESTROY_WITH_PARENT,
-                                    GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
-                                    "Audio is disabled. Touch controls are shown on the game screen. Use MENU for Resume, Back to Library, or Quit Emulator.");
+
+    fprintf(stderr, "NES: launcher action=open-options\n");
+    fflush(stderr);
+
+    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data),
+                                    GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+                                    GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
+                                    "Display: Fullscreen is enabled at launch. Use Exit Fullscreen to return to windowed mode.\n\n"
+                                    "Kindle system toolbar: Swipe down from the top edge to reveal Kindle's system UI while fullscreen.\n\n"
+                                    "Audio: Disabled in this version.\n\n"
+                                    "Controls: Touchscreen controls are shown while a game is running. "
+                                    "Tap MENU for Resume, Back to Library, or Quit Emulator.\n\n"
+                                    "ROM library: Browse .nes files anywhere under /mnt/us.");
     gtk_window_set_title(GTK_WINDOW(dialog), "NES Options");
-    g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
-    gtk_widget_show(dialog);
+    gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
+    gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER_ON_PARENT);
+
+    /*
+     * Run a modal dialog and explicitly present it above the launcher. This
+     * avoids a non-modal information window being created behind a fullscreen
+     * parent on Kindle's lightweight window manager.
+     */
+    gtk_widget_show_all(dialog);
+    gtk_window_present(GTK_WINDOW(dialog));
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    (void)response;
+    gtk_widget_destroy(dialog);
+
+    fprintf(stderr, "NES: launcher action=close-options\n");
+    fflush(stderr);
 }
 
 static GtkWidget *create_main_window(void) {
@@ -815,7 +861,7 @@ static GtkWidget *create_main_window(void) {
     GtkWidget *toolbar = gtk_hbutton_box_new();
     GtkWidget *open_button = gtk_button_new_with_label("Open Game");
     GtkWidget *options_button = gtk_button_new_with_label("Options");
-    GtkWidget *fullscreen_button = gtk_toggle_button_new_with_label("Fullscreen");
+    GtkWidget *fullscreen_button = gtk_toggle_button_new_with_label("Exit Fullscreen");
     GtkWidget *quit_button = gtk_button_new_with_label("Quit");
     GtkWidget *spacer = gtk_label_new("");
     GtkWidget *welcome = gtk_label_new("NES Emulator\n\nTap Open Game to choose a .nes ROM.");
@@ -837,7 +883,9 @@ static GtkWidget *create_main_window(void) {
     gtk_container_add(GTK_CONTAINER(window), vbox);
     g_signal_connect(open_button, "clicked", G_CALLBACK(on_open_game_clicked), NULL);
     g_signal_connect(options_button, "clicked", G_CALLBACK(on_options_clicked), window);
-    g_signal_connect(fullscreen_button, "toggled", G_CALLBACK(on_fullscreen_toggled), window);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fullscreen_button), TRUE);
+    gtk_button_set_label(GTK_BUTTON(fullscreen_button), "Exit Fullscreen");
+    g_signal_connect(fullscreen_button, "clicked", G_CALLBACK(on_fullscreen_clicked), window);
     g_signal_connect(quit_button, "clicked", G_CALLBACK(on_quit_clicked), NULL);
     g_signal_connect(window, "delete-event", G_CALLBACK(on_main_window_delete), NULL);
     return window;
@@ -966,6 +1014,10 @@ int main(int argc, char **argv) {
             char rom_error[256];
             picker_requested = 0;
             gtk_widget_show_all(main_window);
+            if (launcher_fullscreen)
+                gtk_window_fullscreen(GTK_WINDOW(main_window));
+            else
+                gtk_window_unfullscreen(GTK_WINDOW(main_window));
             gtk_main();
             if (quitting) break;
             if (!picker_requested) continue;

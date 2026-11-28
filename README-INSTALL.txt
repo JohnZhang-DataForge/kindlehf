@@ -68,7 +68,8 @@ CONTROLS
 - BACK: upper-left, returns to the native GTK2 main window. Tap Open Game to choose another ROM.
 - MENU: top center. Opens an in-game menu with Resume, Back to Library, and Quit Emulator.
 - PAUSE/RESUME: upper-right.
-- The main-window Options information dialog is non-modal.
+- The main-window Options dialog is modal and is explicitly presented above the launcher.
+- The launcher starts fullscreen using Kindle's window-manager geometry; it does not force the raw framebuffer dimensions, which can crop the app window. Use Exit Fullscreen to return to windowed mode. While fullscreen, swipe down from the top edge to reveal Kindle's native system toolbar.
 - The current Kindle reports one multitouch slot, so simultaneous multi-finger button combinations may not be supported.
 
 NOTES
