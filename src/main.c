@@ -792,21 +792,61 @@ static gboolean on_main_window_delete(GtkWidget *widget, GdkEvent *event, gpoint
     return TRUE;
 }
 
-static void on_fullscreen_toggled(GtkToggleButton *button, gpointer user_data) {
+static void on_fullscreen_clicked(GtkButton *button, gpointer user_data) {
     GtkWindow *window = GTK_WINDOW(user_data);
-    if (gtk_toggle_button_get_active(button)) gtk_window_fullscreen(window);
-    else gtk_window_unfullscreen(window);
+    gboolean fullscreen = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+
+    if (fullscreen) {
+        fprintf(stderr, "NES: launcher action=fullscreen enabled size=%dx%d\\n",
+                screen_w, screen_h);
+        /*
+         * Ask the window manager for fullscreen first. Kindle's lightweight
+         * X11 environment may not implement the EWMH fullscreen hint, so also
+         * remove decorations and explicitly size the window to the framebuffer.
+         */
+        gtk_window_fullscreen(window);
+        gtk_window_set_decorated(window, FALSE);
+        gtk_window_set_resizable(window, FALSE);
+        gtk_window_move(window, 0, 0);
+        gtk_window_resize(window, screen_w, screen_h);
+        gtk_button_set_label(button, "Exit Fullscreen");
+    } else {
+        fprintf(stderr, "NES: launcher action=fullscreen disabled\\n");
+        gtk_window_unfullscreen(window);
+        gtk_window_set_decorated(window, TRUE);
+        gtk_window_set_resizable(window, TRUE);
+        gtk_window_set_default_size(window, 600, 760);
+        gtk_window_set_position(window, GTK_WIN_POS_CENTER);
+        gtk_window_resize(window, 600, 760);
+        gtk_button_set_label(button, "Fullscreen");
+    }
+
+    gtk_widget_queue_resize(GTK_WIDGET(window));
+    fflush(stderr);
 }
 
 static void on_options_clicked(GtkButton *button, gpointer user_data) {
     GtkWidget *dialog;
     (void)button;
-    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data), GTK_DIALOG_DESTROY_WITH_PARENT,
-                                    GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
-                                    "Audio is disabled. Touch controls are shown on the game screen. Use MENU for Resume, Back to Library, or Quit Emulator.");
+
+    fprintf(stderr, "NES: launcher action=open-options\\n");
+    fflush(stderr);
+
+    dialog = gtk_message_dialog_new(GTK_WINDOW(user_data),
+                                    GTK_DIALOG_DESTROY_WITH_PARENT,
+                                    GTK_MESSAGE_INFO, GTK_BUTTONS_CLOSE,
+                                    "Audio output is currently disabled.\\n\\n"
+                                    "Touchscreen controls are displayed while a game is running. "
+                                    "Tap MENU on the game screen to Resume, return to the game "
+                                    "library, or Quit the emulator.\\n\\n"
+                                    "ROM files must be stored under /mnt/us.");
     gtk_window_set_title(GTK_WINDOW(dialog), "NES Options");
-    g_signal_connect_swapped(dialog, "response", G_CALLBACK(gtk_widget_destroy), dialog);
-    gtk_widget_show(dialog);
+    gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
+    g_signal_connect_swapped(dialog, "response",
+                             G_CALLBACK(gtk_widget_destroy), dialog);
+
+    /* Show the dialog's message label and button as well as its top-level. */
+    gtk_widget_show_all(dialog);
 }
 
 static GtkWidget *create_main_window(void) {
@@ -837,7 +877,7 @@ static GtkWidget *create_main_window(void) {
     gtk_container_add(GTK_CONTAINER(window), vbox);
     g_signal_connect(open_button, "clicked", G_CALLBACK(on_open_game_clicked), NULL);
     g_signal_connect(options_button, "clicked", G_CALLBACK(on_options_clicked), window);
-    g_signal_connect(fullscreen_button, "toggled", G_CALLBACK(on_fullscreen_toggled), window);
+    g_signal_connect(fullscreen_button, "clicked", G_CALLBACK(on_fullscreen_clicked), window);
     g_signal_connect(quit_button, "clicked", G_CALLBACK(on_quit_clicked), NULL);
     g_signal_connect(window, "delete-event", G_CALLBACK(on_main_window_delete), NULL);
     return window;
