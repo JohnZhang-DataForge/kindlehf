@@ -1,0 +1,112 @@
+name: "Visual Bug (VBUG)"
+description: "Report display, graphics, layout, or touchscreen UI problems."
+title: "[VBUG]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for problems with how KindleHF looks or displays content:
+        rendering artifacts, incorrect layout, clipped UI, e-ink refresh issues,
+        fullscreen problems, or touchscreen control appearance.
+
+        Please include a screenshot or short video when possible. Do not attach
+        commercial ROMs, BIOS files, Kindle firmware, or other copyrighted assets.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected Area
+      options:
+        - ROM picker / file list
+        - Main window / toolbar
+        - Gameplay graphics
+        - Touchscreen controls / input indicators
+        - Framebuffer / e-ink refresh
+        - Fullscreen / screen layout
+        - Error dialog
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What looks wrong?
+      description: Describe the visual problem and when you notice it.
+      placeholder: The game image is shifted to the right and part of it is clipped...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Launch KindleHF.
+        2. Open a game.
+        3. Enter fullscreen.
+        4. Observe the display.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Appearance
+      placeholder: Describe what you expected to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Appearance
+      placeholder: Describe what appeared instead.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: KindleHF Version or Commit
+      placeholder: v1.0.0 or commit SHA
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Kindle Model and Firmware
+      placeholder: Kindle Basic 10th Gen (2019), firmware 5.16.8
+    validations:
+      required: true
+
+  - type: dropdown
+    id: hardware_test
+    attributes:
+      label: Where was this observed?
+      options:
+        - Physical Kindle device
+        - Build/test environment only
+        - Both
+    validations:
+      required: true
+
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshots or Video
+      description: Drag and drop a screenshot or short recording here, if available.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Include relevant output from /mnt/us/nes/nes.log. Remove personal information first.
+      render: shell
+    validations:
+      required: false
