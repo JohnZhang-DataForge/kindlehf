@@ -1,0 +1,54 @@
+name: "Feature Request"
+description: "Suggest a new feature or an improvement to KindleHF."
+title: "[FEATURE]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve KindleHF. Focus on the user problem and
+        the behavior you would like to see. For substantial changes, please
+        discuss the approach before submitting a pull request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this feature solve?
+      description: Explain the limitation or workflow that could be improved.
+      placeholder: It is difficult to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Feature
+      description: Describe how you think the feature should work.
+      placeholder: I would like KindleHF to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use Case / User Benefit
+      description: Who would benefit, and how would they use this?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any workaround or alternative you have considered.
+    validations:
+      required: false
+
+  - type: textarea
+    id: mockups
+    attributes:
+      label: Mockups or Additional Context
+      description: Screenshots, diagrams, or examples are welcome. Do not attach copyrighted ROMs or firmware.
+    validations:
+      required: false
